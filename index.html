@@ -1,0 +1,4092 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>AI智能日程助手</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.6.2/cropper.min.css" />
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.6.2/cropper.min.js"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@300;400;500;700;900&display=swap" rel="stylesheet">
+  <style>
+    *{margin:0;padding:0;box-sizing:border-box}
+    body{font-family:'Noto Sans SC',sans-serif;background:#070b18;color:white;overflow:hidden;scrollbar-color:rgba(255,255,255,.15) transparent;scrollbar-width:thin}
+    .bg-grid{background-image:linear-gradient(rgba(255,255,255,.03) 1px,transparent 1px),linear-gradient(90deg,rgba(255,255,255,.03) 1px,transparent 1px);background-size:40px 40px}
+    .glass{background:rgba(255,255,255,.06);backdrop-filter:blur(20px);border:1px solid rgba(255,255,255,.08)}
+    .gradient-text{background:linear-gradient(90deg,#7dd3fc,#c084fc,#f9a8d4);-webkit-background-clip:text;-webkit-text-fill-color:transparent}
+    .main-wrapper{width:200vw;height:100vh;display:flex;transition:transform .7s cubic-bezier(.77,0,.18,1)}
+    .page{width:100vw;height:100vh;overflow-y:auto;padding:28px;flex-shrink:0}
+    .quadrant{height:430px;min-height:430px;position:relative;z-index:1;display:flex;flex-direction:column;overflow:hidden}.quadrant.select-open{z-index:1200}.task-card{transition:.3s ease;cursor:pointer}.task-card:hover{transform:translateY(-4px) scale(1.01)}.task-card.select-open{z-index:1400}
+    .calendar-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:12px}.calendar-day{min-height:140px;transition:all .45s cubic-bezier(.77,0,.18,1)}
+    .calendar-animate{animation:calendarFade .45s cubic-bezier(.77,0,.18,1)}@keyframes calendarFade{from{opacity:0;transform:translateY(14px)}to{opacity:1;transform:translateY(0)}}
+    .today-highlight{border:1px solid rgba(125,211,252,.5);box-shadow:0 0 24px rgba(125,211,252,.25)}
+    .weekly-completed-panel{transition:opacity .25s ease, transform .25s ease}
+    .weekly-completed-number{font-variant-numeric:tabular-nums;line-height:1;text-shadow:0 0 24px rgba(74,222,128,.45)}
+    .nav-btn{position:fixed;top:50%;transform:translateY(-50%);display:flex;align-items:center;justify-content:center;z-index:100;width:54px;height:54px;border-radius:50%;border:none;background:rgba(255,255,255,.08);color:white;font-size:26px;line-height:1;padding-bottom:2px;backdrop-filter:blur(10px);cursor:pointer}.left-btn{left:18px}.right-btn{right:18px}
+    .highlight{color:#7dd3fc;font-weight:700}.tag{padding:4px 12px;border-radius:999px;font-size:12px;background:rgba(255,255,255,.08)}
+    textarea::-webkit-scrollbar{width:8px;background:transparent}textarea::-webkit-scrollbar-track{background:transparent}textarea::-webkit-scrollbar-thumb{background:rgba(120,120,120,.55);border-radius:999px;transition:background .4s ease}textarea.scrolling::-webkit-scrollbar-thumb{background:rgba(255,255,255,.9)}
+    .cropper-point{width:34px!important;height:34px!important;background:transparent!important;opacity:1!important}.cropper-point.point-se,.cropper-point.point-sw,.cropper-point.point-ne,.cropper-point.point-nw{display:block!important}.cropper-point.point-e,.cropper-point.point-w,.cropper-point.point-n,.cropper-point.point-s{display:none!important}.cropper-point::before,.cropper-point::after{content:'';position:absolute;background:white;border-radius:999px}.cropper-point.point-nw::before,.cropper-point.point-sw::before{left:0;top:0;width:8px;height:34px}.cropper-point.point-ne::before,.cropper-point.point-se::before{right:0;top:0;width:8px;height:34px}.cropper-point.point-nw::after,.cropper-point.point-ne::after{left:0;top:0;width:34px;height:8px}.cropper-point.point-sw::after,.cropper-point.point-se::after{left:0;bottom:0;width:34px;height:8px}.cropper-line{background:rgba(255,255,255,.85)!important}.cropper-view-box{outline:2px solid rgba(255,255,255,.95)!important}
+    .pulse{animation:pulse 2s infinite}@keyframes pulse{0%{box-shadow:0 0 0 0 rgba(125,211,252,.5)}70%{box-shadow:0 0 0 20px rgba(125,211,252,0)}100%{box-shadow:0 0 0 0 rgba(125,211,252,0)}}.particle-dot{
+      position:fixed;
+      width:5px;
+      height:5px;
+      border-radius:999px;
+      background:rgba(255,255,255,.9);
+      pointer-events:none;
+      z-index:9999;
+      animation:particleFly .9s cubic-bezier(.22,.61,.36,1) forwards;
+    }
+    @keyframes particleFly{
+      to{
+        transform:translate(var(--dx),var(--dy)) scale(0);
+        opacity:0;
+        filter:blur(2px);
+      }
+    }
+    .editable-field{
+      cursor:text;
+      padding:2px 6px;
+      border-radius:8px;
+      transition:background .2s ease, box-shadow .2s ease;
+      display:inline-block;
+      min-width:48px;
+    }
+    .editable-field:hover{
+      background:rgba(125,211,252,.08);
+    }
+    .editable-field:focus{
+      outline:none;
+      background:rgba(125,211,252,.12);
+      box-shadow:0 0 0 1px rgba(125,211,252,.35);
+    }
+    .editable-block{
+      cursor:text;
+      padding:6px 8px;
+      border-radius:10px;
+      transition:background .2s ease, box-shadow .2s ease;
+      display:block;
+      white-space:pre-wrap;
+    }
+    .editable-block:hover{
+      background:rgba(125,211,252,.08);
+    }
+    .editable-block:focus{
+      outline:none;
+      background:rgba(125,211,252,.12);
+      box-shadow:0 0 0 1px rgba(125,211,252,.35);
+    }
+    .editable-chip{
+      position:relative;
+      padding:8px 30px 8px 14px;
+      border-radius:999px;
+      background:rgba(255,255,255,.05);
+      border:1px solid rgba(255,255,255,.1);
+      display:inline-flex;
+      align-items:center;
+      gap:8px;
+    }
+    .chip-close{
+      position:absolute;
+      top:-6px;
+      right:-6px;
+      width:18px;
+      height:18px;
+      border-radius:999px;
+      background:rgba(239,68,68,.95);
+      color:white;
+      font-size:12px;
+      line-height:18px;
+      text-align:center;
+      cursor:pointer;
+      box-shadow:0 4px 14px rgba(0,0,0,.25);
+    }
+    .chip-close:hover{
+      transform:scale(1.08);
+    }
+    .task-disintegrating{
+      opacity:0;
+      transform:translateX(-30px) scale(.96);
+      filter:blur(8px);
+      transition:all .45s ease;
+    }
+    .task-completing-right{
+      opacity:0;
+      transform:translateX(30px) scale(.96);
+      filter:blur(8px);
+      transition:all .45s ease;
+    }
+    .do-btn{
+      position:relative;
+      min-width:72px;
+      height:42px;
+      overflow:hidden;
+      display:inline-flex;
+      align-items:center;
+      justify-content:center;
+    }
+    .do-label{
+      display:inline-block;
+      transition:opacity .22s ease, transform .22s ease;
+    }
+    .do-check{
+      position:absolute;
+      inset:0;
+      display:flex;
+      align-items:center;
+      justify-content:center;
+      opacity:0;
+      transform:scale(.58);
+      filter:drop-shadow(0 0 8px rgba(74,222,128,.75));
+      transition:opacity .25s ease, transform .38s cubic-bezier(.16,1,.3,1);
+    }
+    .do-btn.do-running{
+      pointer-events:none;
+      color:transparent;
+      background:rgba(34,197,94,.16);
+      border-color:rgba(74,222,128,.9);
+      box-shadow:0 0 0 1px rgba(74,222,128,.18), 0 0 22px rgba(74,222,128,.25);
+    }
+    .do-btn.do-running .do-label{
+      opacity:0;
+      transform:scale(.45) rotate(-18deg);
+    }
+    .do-btn.do-running .do-check{
+      opacity:1;
+      transform:scale(1);
+    }
+    .do-check-circle{
+      stroke-dasharray:75;
+      stroke-dashoffset:75;
+    }
+    .do-check-mark{
+      stroke-dasharray:22;
+      stroke-dashoffset:22;
+    }
+    .do-btn.do-running .do-check-circle{
+      animation:doCircle .42s ease forwards;
+    }
+    .do-btn.do-running .do-check-mark{
+      animation:doMark .34s ease .28s forwards;
+    }
+    @keyframes doCircle{to{stroke-dashoffset:0}}
+    @keyframes doMark{to{stroke-dashoffset:0}}
+    .glass-select{
+      position:relative;
+      display:inline-block;
+      min-width:148px;
+      z-index:30;
+    }
+    .glass-select.open{
+      z-index:1600;
+    }
+    .glass-select-trigger{
+      width:100%;
+      min-height:52px;
+      display:flex;
+      align-items:center;
+      justify-content:space-between;
+      gap:14px;
+      padding:0 18px;
+      border-radius:18px;
+      border:1px solid rgba(255,255,255,.14);
+      background:rgba(255,255,255,.08);
+      color:white;
+      font-weight:900;
+      font-size:18px;
+      backdrop-filter:blur(12px);
+      box-shadow:inset 0 1px 0 rgba(255,255,255,.08);
+      cursor:pointer;
+      transition:background .2s ease, border-color .2s ease, transform .2s ease;
+    }
+    .glass-select-trigger:hover,.glass-select.open .glass-select-trigger{
+      background:rgba(255,255,255,.12);
+      border-color:rgba(125,211,252,.35);
+    }
+    .glass-select-arrow{
+      font-size:22px;
+      line-height:1;
+      transform:translateY(-1px);
+      transition:none;
+    }
+    .glass-select-menu{
+      position:absolute;
+      top:calc(100% + 8px);
+      left:0;
+      min-width:100%;
+      width:max-content;
+      max-width:260px;
+      display:none;
+      padding:8px;
+      border-radius:18px;
+      border:1px solid rgba(148,163,184,.34);
+      background:rgba(15,23,42,.96);
+      backdrop-filter:blur(18px) saturate(130%);
+      -webkit-backdrop-filter:blur(18px) saturate(130%);
+      box-shadow:0 22px 58px rgba(0,0,0,.62), inset 0 1px 0 rgba(255,255,255,.10);
+      z-index:1700;
+    }
+    .glass-select.open .glass-select-menu{
+      display:grid;
+      gap:4px;
+    }
+    .glass-select-option{
+      width:100%;
+      min-width:132px;
+      display:flex;
+      align-items:center;
+      justify-content:flex-start;
+      padding:10px 16px;
+      border:0;
+      border-radius:14px;
+      background:transparent;
+      color:white;
+      font-size:17px;
+      font-weight:800;
+      line-height:1.2;
+      text-align:left;
+      white-space:nowrap;
+      cursor:pointer;
+      transition:background .16s ease, color .16s ease;
+    }
+    .glass-select-option:hover{
+      background:rgba(51,65,85,.96);
+    }
+    .glass-select-option.selected{
+      background:rgba(14,116,144,.90);
+      color:#cffafe;
+    }
+
+    .quadrant-page-body{
+      flex:1;
+      min-height:0;
+      display:flex;
+      flex-direction:column;
+      gap:12px;
+    }
+    .quadrant-empty{
+      flex:1;
+      display:flex;
+      align-items:center;
+      justify-content:center;
+      color:rgba(203,213,225,.52);
+      border:1px dashed rgba(255,255,255,.09);
+      border-radius:18px;
+      font-weight:800;
+    }
+    .quadrant-pager{
+      height:42px;
+      margin-top:auto;
+      padding-top:10px;
+      border-top:1px solid rgba(255,255,255,.08);
+      display:flex;
+      align-items:center;
+      justify-content:space-between;
+      gap:10px;
+      color:#94a3b8;
+      font-size:13px;
+      font-weight:800;
+    }
+    .quadrant-page-btn{
+      width:34px;
+      height:30px;
+      border-radius:12px;
+      border:1px solid rgba(255,255,255,.12);
+      background:rgba(255,255,255,.06);
+      color:white;
+      cursor:pointer;
+      transition:background .18s ease, transform .18s ease, opacity .18s ease;
+    }
+    .quadrant-page-btn:hover:not(:disabled){
+      background:rgba(125,211,252,.16);
+      transform:translateY(-1px);
+    }
+    .quadrant-page-btn:disabled{
+      opacity:.35;
+      cursor:not-allowed;
+    }
+    .task-card.compact-task-card{
+      padding:12px 14px;
+      min-height:64px;
+      cursor:pointer;
+      overflow:hidden;
+      display:grid;
+      grid-template-columns:minmax(0,1fr) auto;
+      align-items:center;
+      gap:12px;
+    }
+    .task-card.compact-task-card:hover{
+      transform:translateY(-2px) scale(1.004);
+      border-color:rgba(125,211,252,.22);
+      box-shadow:0 14px 34px rgba(0,0,0,.24);
+    }
+    .compact-task-title{
+      font-size:18px;
+      line-height:1.32;
+      letter-spacing:.01em;
+      margin-bottom:0;
+      display:-webkit-box;
+      -webkit-line-clamp:2;
+      -webkit-box-orient:vertical;
+      overflow:hidden;
+    }
+    .compact-card-actions{
+      display:flex;
+      align-items:center;
+      justify-content:flex-end;
+      gap:8px;
+      padding-top:0;
+      border-top:0;
+      flex-shrink:0;
+    }
+    .compact-do-btn{
+      min-width:66px;
+      height:36px;
+      border-radius:13px;
+    }
+    .compact-delete-btn{
+      min-width:92px;
+      height:36px;
+      padding:0 12px;
+      border-radius:13px;
+      font-size:13px;
+      font-weight:800;
+    }
+
+    .task-modal-backdrop{
+      position:fixed;
+      inset:0;
+      z-index:5000;
+      display:none;
+      align-items:center;
+      justify-content:center;
+      padding:28px;
+      background:rgba(2,6,23,.68);
+      backdrop-filter:blur(12px);
+      -webkit-backdrop-filter:blur(12px);
+    }
+    .task-modal-backdrop.open{display:flex;}
+    .task-modal-panel{
+      width:min(920px,calc(100vw - 36px));
+      max-height:calc(100vh - 56px);
+      overflow:auto;
+      border-radius:30px;
+      background:rgba(31,41,55,.96);
+      border:1px solid rgba(255,255,255,.14);
+      box-shadow:0 34px 120px rgba(0,0,0,.62), inset 0 1px 0 rgba(255,255,255,.08);
+      padding:28px;
+      animation:taskModalIn .22s cubic-bezier(.16,1,.3,1);
+    }
+    @keyframes taskModalIn{from{opacity:0;transform:translateY(18px) scale(.98)}to{opacity:1;transform:translateY(0) scale(1)}}
+    .task-modal-close{
+      width:42px;
+      height:42px;
+      border-radius:999px;
+      border:1px solid rgba(255,255,255,.12);
+      background:rgba(255,255,255,.07);
+      color:white;
+      font-size:22px;
+      line-height:1;
+      display:flex;
+      align-items:center;
+      justify-content:center;
+      cursor:pointer;
+      transition:background .2s ease, transform .2s ease;
+    }
+    .task-modal-close:hover{background:rgba(255,255,255,.13);transform:scale(1.04)}
+
+    .task-modal-title-editor{
+      color:#7dd3fc!important;
+      -webkit-text-fill-color:#7dd3fc!important;
+      background:none!important;
+      -webkit-background-clip:initial!important;
+      background-clip:initial!important;
+      min-width:280px;
+      max-width:min(620px,68vw);
+      min-height:48px;
+      padding:6px 10px;
+      line-height:1.35;
+      white-space:pre-wrap;
+      word-break:break-word;
+    }
+    .task-modal-title-editor:empty::before{
+      content:'输入日程标题';
+      color:rgba(148,163,184,.72);
+      -webkit-text-fill-color:rgba(148,163,184,.72);
+    }
+    .task-modal-detail-grid{
+      display:grid;
+      gap:16px;
+      margin-top:20px;
+    }
+    .task-modal-detail-row{
+      display:grid;
+      grid-template-columns:154px 1fr;
+      gap:14px;
+      align-items:start;
+      padding:13px 0;
+      border-bottom:1px solid rgba(255,255,255,.07);
+      color:#cbd5e1;
+      line-height:1.75;
+    }
+    .task-modal-detail-label{
+      color:#e2e8f0;
+      font-weight:900;
+      white-space:nowrap;
+    }
+    .task-modal-actions{
+      display:flex;
+      flex-wrap:wrap;
+      align-items:center;
+      justify-content:space-between;
+      gap:18px;
+      margin-top:24px;
+      padding-top:20px;
+      border-top:1px solid rgba(255,255,255,.10);
+    }
+    @media (max-width:720px){
+      .task-modal-panel{padding:22px;border-radius:24px;}
+      .task-modal-detail-row{grid-template-columns:1fr;gap:6px;}
+    }
+
+    .batch-fallback-modal{
+      position:fixed;
+      inset:0;
+      z-index:2200;
+      display:flex;
+      align-items:center;
+      justify-content:center;
+      padding:24px;
+      background:rgba(2,6,23,.72);
+      backdrop-filter:blur(10px);
+    }
+    .batch-fallback-card{
+      width:min(760px,92vw);
+      border-radius:28px;
+      border:1px solid rgba(148,163,184,.28);
+      background:rgba(15,23,42,.96);
+      box-shadow:0 28px 90px rgba(0,0,0,.62), inset 0 1px 0 rgba(255,255,255,.08);
+      padding:28px;
+    }
+    .batch-fallback-title{
+      font-size:28px;
+      line-height:1.2;
+      font-weight:900;
+      color:#bae6fd;
+      margin-bottom:12px;
+    }
+    .batch-fallback-body{
+      color:#cbd5e1;
+      line-height:1.9;
+      font-size:15px;
+      margin-bottom:20px;
+    }
+    .batch-fallback-preview{
+      max-height:180px;
+      overflow:auto;
+      white-space:pre-wrap;
+      word-break:break-word;
+      border-radius:18px;
+      border:1px solid rgba(255,255,255,.1);
+      background:rgba(2,6,23,.42);
+      color:#94a3b8;
+      padding:16px;
+      margin:14px 0 22px;
+      font-size:13px;
+      line-height:1.7;
+    }
+    .batch-fallback-actions{
+      display:flex;
+      justify-content:flex-end;
+      gap:14px;
+      flex-wrap:wrap;
+    }
+    .batch-fallback-btn{
+      min-width:128px;
+      border-radius:18px;
+      padding:13px 22px;
+      font-weight:900;
+      transition:transform .18s ease, opacity .18s ease, background .18s ease;
+    }
+    .batch-fallback-btn:hover{transform:translateY(-1px)}
+    .batch-fallback-continue{
+      background:#22d3ee;
+      color:#06121f;
+    }
+    .batch-fallback-skip{
+      background:rgba(255,255,255,.08);
+      color:#e2e8f0;
+      border:1px solid rgba(255,255,255,.14);
+    }
+    select option{background:#111827;color:white}
+  </style>
+</head>
+<body class="bg-grid">
+<button class="nav-btn left-btn" onclick="switchPage(0)">←</button><button class="nav-btn right-btn" onclick="switchPage(1)">→</button>
+<div class="main-wrapper" id="mainWrapper">
+<section class="page">
+  <div class="flex justify-between items-center mb-8"><div><div class="tag mb-3">AI Campus Productivity</div><h1 class="text-5xl font-black mb-3">AI智能日程助手</h1><p class="text-slate-300">自动识别通知 · AI分类 · 时间提取 · DDL提醒</p></div><div class="glass rounded-3xl px-5 py-4 flex items-center gap-4"><div class="w-3 h-3 bg-cyan-400 rounded-full pulse"></div><div><div class="text-sm text-slate-400">AI状态</div><div class="font-bold">运行中</div></div></div></div>
+  <div class="glass rounded-[30px] p-8 mb-8"><div class="mb-8"><h2 class="text-3xl font-black mb-3 gradient-text">上传通知截图</h2></div>
+    <div class="grid lg:grid-cols-2 gap-8"><div class="glass rounded-3xl p-5"><div class="font-bold text-xl mb-4">原始通知预览</div><div class="relative"><img id="previewImage" class="rounded-2xl w-full max-h-[420px] object-cover hidden"><button id="removeImageBtn" onclick="removeImage()" class="hidden absolute top-3 right-3 w-10 h-10 rounded-full bg-red-500 text-white text-2xl flex items-center justify-center shadow-lg hover:scale-110 transition-all duration-300">×</button></div><div id="emptyPreview" class="h-[300px] flex flex-col items-center justify-center text-slate-500 border border-dashed border-white/10 rounded-2xl gap-6"><div>暂未上传图片</div><label class="px-6 py-3 rounded-xl bg-cyan-400 text-black font-bold cursor-pointer hover:scale-105 transition">上传图片<input type="file" id="imageInput" hidden accept="image/*"></label><label id="batchImportBtn" class="px-6 py-3 rounded-xl glass text-cyan-200 border border-cyan-300/20 font-bold cursor-pointer hover:scale-105 transition">批量导入<input type="file" id="batchImageInput" hidden accept="image/*" multiple></label><div id="batchProgress" class="text-sm text-cyan-200 min-h-5"></div></div></div>
+      <div class="glass rounded-3xl p-5"><div class="flex justify-between items-center mb-4"><div class="font-bold text-xl">AI识别结果</div><div class="tag">OCR + NLP</div></div><textarea id="ocrText" class="w-full h-[300px] bg-transparent outline-none resize-none text-slate-300 leading-8" placeholder="裁剪确认后将调用真实OCR接口..."></textarea><div class="mt-4 flex items-center justify-between gap-4 flex-wrap"><div class="flex gap-3 flex-wrap"><button id="singleScheduleBtn" onclick="analyzeText('single')" class="px-6 py-3 rounded-xl bg-cyan-400 text-black font-bold hover:scale-105 transition">单日程</button><button id="multiScheduleBtn" onclick="analyzeText('multi')" class="px-6 py-3 rounded-xl bg-purple-400 text-black font-bold hover:scale-105 transition">多日程</button></div><button id="confirmBtn" onclick="confirmAddTasks()" class="px-6 py-3 rounded-xl bg-cyan-400 text-black font-bold hover:scale-105 transition opacity-40 pointer-events-none">确认添加</button></div></div></div></div>
+  <div class="glass rounded-[30px] p-6 mb-8"><div class="flex flex-wrap gap-4 items-center justify-between mb-6"><h2 class="text-3xl font-black">通知分类</h2><div class="flex gap-3"><input id="newCategory" placeholder="添加分类" class="bg-white/5 border border-white/10 rounded-xl px-4 py-2 outline-none"><button onclick="addCategory()" class="bg-purple-400 text-black px-5 py-2 rounded-xl font-bold">添加</button></div></div><div id="categoryList" class="flex flex-wrap gap-3"></div></div>
+
+  <div class="glass rounded-[30px] p-6 mb-8">
+    <div class="flex flex-wrap gap-4 items-center justify-between mb-6">
+      <div>
+        <h2 class="text-3xl font-black">时间感知设置</h2>
+        <p class="text-slate-400 text-sm mt-2">用于把 OCR 中的“今天 / 明天 / 后天”换算成准确日期；默认按北京时间。</p>
+      </div>
+      <div class="tag" id="timeContextLabel">北京时间 · 自动取今天</div>
+    </div>
+    <div class="grid gap-4 lg:grid-cols-4">
+      <label class="rounded-2xl border border-white/10 bg-white/[.035] px-4 py-3 focus-within:border-cyan-300/40">
+        <span class="mb-2 block text-xs font-bold uppercase tracking-[.16em] text-slate-500">Timezone</span>
+        <select id="timeZoneSelect" onchange="handleTimezonePresetChange()" class="w-full bg-transparent text-slate-100 outline-none">
+          <option value="Asia/Shanghai">北京时间 Asia/Shanghai</option>
+          <option value="America/New_York">纽约 America/New_York</option>
+          <option value="America/Los_Angeles">洛杉矶 America/Los_Angeles</option>
+          <option value="Europe/London">伦敦 Europe/London</option>
+          <option value="Asia/Tokyo">东京 Asia/Tokyo</option>
+          <option value="UTC">UTC</option>
+          <option value="custom">自定义 IANA 时区</option>
+        </select>
+      </label>
+      <label class="rounded-2xl border border-white/10 bg-white/[.035] px-4 py-3 focus-within:border-cyan-300/40">
+        <span class="mb-2 block text-xs font-bold uppercase tracking-[.16em] text-slate-500">Custom Timezone</span>
+        <input id="customTimeZone" value="Asia/Shanghai" oninput="updateTimeContextLabel()" placeholder="如 Asia/Shanghai" class="w-full bg-transparent text-slate-100 outline-none">
+      </label>
+      <label class="rounded-2xl border border-white/10 bg-white/[.035] px-4 py-3 focus-within:border-cyan-300/40">
+        <span class="mb-2 block text-xs font-bold uppercase tracking-[.16em] text-slate-500">Reference Date</span>
+        <input id="referenceDateInput" type="date" onchange="syncQuickReferenceInput();updateTimeContextLabel()" class="w-full bg-transparent text-slate-100 outline-none">
+      </label>
+      <label class="rounded-2xl border border-white/10 bg-white/[.035] px-4 py-3 focus-within:border-cyan-300/40">
+        <span class="mb-2 block text-xs font-bold uppercase tracking-[.16em] text-slate-500">Quick Base Date</span>
+        <div class="flex gap-2 items-center">
+          <input id="quickReferenceDateInput" placeholder="如 5.21 / 5月21日" onkeydown="handleQuickReferenceKey(event)" class="min-w-0 flex-1 bg-transparent text-slate-100 outline-none">
+          <button type="button" onclick="applyQuickReferenceDate()" class="shrink-0 rounded-lg bg-cyan-400 px-3 py-1.5 text-xs font-black text-black">设置</button>
+        </div>
+      </label>
+    </div>
+    <div class="mt-4 flex flex-wrap gap-3 text-sm text-slate-400">
+      <button onclick="resetReferenceDate()" class="px-4 py-2 rounded-xl bg-cyan-400 text-black font-bold">使用当前时区今天</button>
+      <span>例：基准日期设为 5.21 / 2026-05-21 时，“明天”会解析为 5.22，“后天”会解析为 5.23。</span>
+    </div>
+  </div>
+
+  <div class="glass rounded-[30px] p-6 mb-8">
+    <div class="flex flex-wrap gap-4 items-center justify-between mb-6">
+      <div>
+        <h2 class="text-3xl font-black">OCR换行关键词</h2>
+        <p class="text-slate-400 text-sm mt-2">识别后自动在关键词前换行，并清理多余换行，提升后续 AI 分析准确度。</p>
+      </div>
+      <div class="flex gap-3">
+        <input id="newBreakKeyword" placeholder="添加换行关键词" class="bg-white/5 border border-white/10 rounded-xl px-4 py-2 outline-none">
+        <button onclick="addBreakKeyword()" class="bg-cyan-400 text-black px-5 py-2 rounded-xl font-bold">添加</button>
+      </div>
+    </div>
+    <div class="mb-5 overflow-hidden rounded-[24px] border border-cyan-300/15 bg-slate-950/45 shadow-[0_20px_60px_rgba(8,15,35,.35)]">
+      <div class="flex flex-wrap items-center justify-between gap-4 border-b border-white/10 bg-white/[.035] px-5 py-4">
+        <div class="flex items-center gap-4">
+          <div class="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl border border-cyan-300/25 bg-cyan-300/10 text-sm font-black text-cyan-100">API</div>
+          <div>
+            <div class="font-black text-xl">MiniMax 文本清洗</div>
+            <div class="mt-1 flex flex-wrap items-center gap-2 text-xs text-slate-400">
+              <span class="rounded-full border border-emerald-300/20 bg-emerald-300/10 px-2.5 py-1 text-emerald-200">云端清洗</span>
+              <span class="rounded-full border border-slate-400/20 bg-white/5 px-2.5 py-1">本地兜底</span>
+              <span>OCR 文本结构化</span>
+            </div>
+          </div>
+        </div>
+        <label class="flex items-center gap-3 rounded-full border border-cyan-300/20 bg-cyan-300/10 px-4 py-2 text-sm font-bold text-cyan-100">
+          <input id="minimaxCleanEnabled" type="checkbox" checked class="accent-cyan-400">
+          启用
+        </label>
+      </div>
+      <div class="grid gap-4 p-5 xl:grid-cols-[260px_1fr]">
+        <div class="rounded-2xl border border-white/10 bg-white/[.035] p-4">
+          <div class="text-xs font-bold uppercase tracking-[.18em] text-slate-500">Connection</div>
+          <div class="mt-4 space-y-3 text-sm">
+            <div class="flex items-center justify-between gap-3">
+              <span class="text-slate-400">Provider</span>
+              <span class="font-bold text-slate-100">MiniMax</span>
+            </div>
+            <div class="flex items-center justify-between gap-3">
+              <span class="text-slate-400">Mode</span>
+              <span class="font-bold text-cyan-200">Cloud</span>
+            </div>
+            <div class="flex items-center justify-between gap-3">
+              <span class="text-slate-400">Fallback</span>
+              <span class="font-bold text-emerald-200">Local</span>
+            </div>
+          </div>
+        </div>
+        <div class="grid gap-4 lg:grid-cols-[1fr_230px]">
+          <label class="lg:col-span-2 rounded-2xl border border-white/10 bg-white/[.035] px-4 py-3 focus-within:border-cyan-300/40">
+            <span class="mb-2 block text-xs font-bold uppercase tracking-[.16em] text-slate-500">Endpoint</span>
+            <input id="minimaxBaseUrl" value="https://api.minimaxi.com/v1/chat/completions" class="w-full bg-transparent text-slate-100 outline-none">
+          </label>
+          <label class="rounded-2xl border border-white/10 bg-white/[.035] px-4 py-3 focus-within:border-cyan-300/40">
+            <span class="mb-2 block text-xs font-bold uppercase tracking-[.16em] text-slate-500">API Key</span>
+            <input id="minimaxApiKey" type="password" placeholder="仅保存在当前浏览器" class="w-full bg-transparent text-slate-100 outline-none">
+          </label>
+          <label class="rounded-2xl border border-white/10 bg-white/[.035] px-4 py-3 focus-within:border-cyan-300/40">
+            <span class="mb-2 block text-xs font-bold uppercase tracking-[.16em] text-slate-500">Model</span>
+            <input id="minimaxModel" value="MiniMax-M2.7" class="w-full bg-transparent text-slate-100 outline-none">
+          </label>
+        </div>
+      </div>
+    </div>
+    <div id="breakKeywordList" class="flex flex-wrap gap-3"></div>
+  </div>
+
+  <div><div class="flex justify-between items-center mb-8"><h2 class="text-4xl font-black">通知优先级四象限</h2><div class="text-slate-400">支持 AI 自动判断 + 手动修改</div></div><div class="grid grid-cols-1 lg:grid-cols-2 gap-6"><div class="glass quadrant rounded-[28px] p-6 border border-red-400/20"><div class="flex justify-between items-center mb-5"><h3 class="text-2xl font-black text-red-300">重要且紧急</h3><div class="tag">立即处理</div></div><div id="q1" class="space-y-4"></div></div><div class="glass quadrant rounded-[28px] p-6 border border-cyan-400/20"><div class="flex justify-between items-center mb-5"><h3 class="text-2xl font-black text-cyan-300">重要不紧急</h3><div class="tag">规划安排</div></div><div id="q2" class="space-y-4"></div></div><div class="glass quadrant rounded-[28px] p-6 border border-yellow-400/20"><div class="flex justify-between items-center mb-5"><h3 class="text-2xl font-black text-yellow-300">不重要但紧急</h3><div class="tag">快速完成</div></div><div id="q3" class="space-y-4"></div></div><div class="glass quadrant rounded-[28px] p-6 border border-slate-400/20"><div class="flex justify-between items-center mb-5"><h3 class="text-2xl font-black text-slate-300">不重要不紧急</h3><div class="tag">低优先级</div></div><div id="q4" class="space-y-4"></div></div></div></div>
+</section>
+<section class="page"><div class="flex justify-between items-center mb-10"><div><div class="tag mb-3">Calendar View</div><h1 class="text-5xl font-black gradient-text">AI智能日历视图</h1></div><div class="glass rounded-2xl px-5 py-3 flex items-center gap-5"><button onclick="changeMonth(-1)" class="text-2xl">←</button><div class="text-center"><div class="text-slate-400 text-sm">当前月份</div><div class="font-bold text-2xl" id="monthLabel">2026 · MAY</div></div><button onclick="changeMonth(1)" class="text-2xl">→</button></div></div><div class="flex justify-between items-center mb-6 gap-4 flex-wrap"><div class="flex gap-3"><button id="monthViewBtn" onclick="switchCalendarView('month')" class="px-5 py-2 rounded-xl bg-cyan-400 text-black font-bold transition-all duration-300">月视图</button><button id="weekViewBtn" onclick="switchCalendarView('week')" class="px-5 py-2 rounded-xl glass font-bold transition-all duration-300">周视图</button></div><div class="flex items-center gap-4"><button onclick="goToToday()" class="px-4 py-2 rounded-xl bg-cyan-400 text-black font-black hover:scale-105 transition-all duration-300">今</button><button onclick="changeWeek(-1)" class="glass rounded-xl px-4 py-2">← 上一周</button><button onclick="changeWeek(1)" class="glass rounded-xl px-4 py-2">下一周 →</button></div></div><div id="weekCompletedPanel" class="weekly-completed-panel hidden glass rounded-[28px] p-6 mb-6 border border-emerald-400/20"><div class="flex items-center justify-between gap-6 flex-wrap"><div><div class="tag mb-3 bg-emerald-400/10 text-emerald-200 border border-emerald-400/20">Weekly Done</div><h2 class="text-3xl font-black">已完成</h2><p id="weekCompletedRange" class="text-slate-400 text-sm mt-2">本周完成统计</p></div><div class="flex items-end gap-3"><span id="weekCompletedCount" class="weekly-completed-number text-7xl font-black text-emerald-300">0</span><span class="text-slate-300 font-bold mb-2">项</span></div></div></div><div class="calendar-grid mb-4 text-center text-slate-400 font-bold"><div>周一</div><div>周二</div><div>周三</div><div>周四</div><div>周五</div><div>周六</div><div>周日</div></div><div class="calendar-grid" id="calendarGrid"></div></section>
+</div>
+
+<div id="taskModalBackdrop" class="task-modal-backdrop" onclick="handleTaskModalBackdropClick(event)">
+  <div id="taskModalPanel" class="task-modal-panel" onclick="event.stopPropagation()"></div>
+</div>
+
+<div id="batchFallbackModal" class="batch-fallback-modal hidden">
+  <div class="batch-fallback-card">
+    <div class="batch-fallback-title">批量导入暂停确认</div>
+    <div class="batch-fallback-body">
+      当前图片疑似包含表格或多日程内容，但系统没有拆出稳定可用的多条日程。<br>
+      你可以选择将它作为一条兜底日程继续添加，或跳过这张图片并处理下一张。
+    </div>
+    <div id="batchFallbackMeta" class="text-sm text-cyan-200 font-bold mb-2"></div>
+    <div id="batchFallbackPreview" class="batch-fallback-preview"></div>
+    <div class="batch-fallback-actions">
+      <button type="button" class="batch-fallback-btn batch-fallback-skip" onclick="resolveBatchFallbackDecision('skip')">跳过</button>
+      <button type="button" class="batch-fallback-btn batch-fallback-continue" onclick="resolveBatchFallbackDecision('continue')">继续添加</button>
+    </div>
+  </div>
+</div>
+
+<div id="cropModal" class="hidden fixed inset-0 bg-black/70 z-[999] flex items-center justify-center p-8"><div class="glass rounded-[32px] p-6 w-full max-w-4xl"><div class="flex justify-between items-center mb-6"><h2 class="text-3xl font-black gradient-text">裁剪图片</h2><div class="flex items-center gap-3"><button id="autoCropBtn" onclick="autoCropWhiteBubble()" title="自动定位通知区域" aria-label="自动定位通知区域" class="w-10 h-10 rounded-full bg-cyan-400/15 text-cyan-200 border border-cyan-300/30 hover:bg-cyan-400/25 hover:scale-105 transition flex items-center justify-center"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M4 8V5.5A1.5 1.5 0 0 1 5.5 4H8" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><path d="M16 4h2.5A1.5 1.5 0 0 1 20 5.5V8" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><path d="M20 16v2.5a1.5 1.5 0 0 1-1.5 1.5H16" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><path d="M8 20H5.5A1.5 1.5 0 0 1 4 18.5V16" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><path d="M8 12h8M12 8v8" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg></button><button onclick="closeCropper()" class="w-10 h-10 rounded-full bg-white/10 hover:bg-white/20 transition">✕</button></div></div><div class="max-h-[70vh] overflow-hidden rounded-2xl"><img id="cropImage" class="w-full"></div><div class="flex justify-end gap-4 mt-6"><button onclick="closeCropper()" class="px-6 py-3 rounded-xl glass">取消</button><button onclick="applyCrop()" class="px-6 py-3 rounded-xl bg-cyan-400 text-black font-bold hover:scale-105 transition-all duration-300">确认裁剪</button></div></div></div>
+<script>
+let currentPage=0,currentMonth=new Date().getMonth(),currentWeek=Math.floor((new Date().getDate()-1)/7),calendarView='month';const QUADRANT_PAGE_SIZE=4;const quadrantPageState={q1:0,q2:0,q3:0,q4:0};const monthNames=['JAN','FEB','MAR','APR','MAY','JUN','JUL','AUG','SEP','OCT','NOV','DEC'];const categories=['作业','考试','活动','报名','会议','课程','等待交接工作','正在进行工作','其他'];const breakKeywords=['时间','开始时间','截止时间','结束时间','报名截止时间','截止','地点','日期','集合','返回','报名','签到','链接','会议','作业','考试'];const tasks=[];let pendingTasks=[],cropper=null,croppedBlob=null,scrollTimeout,currentObjectURL=null,lastParseWarning='',pendingAddMode='normal';let taskIdSeed=Date.now();
+const MINIMAX_CONFIG={
+  apiKey:'sk-api-mweX65VX-M_Yu07lbPCGrkaZ4ffMliYKLuj0Ckog7HyZYO2IDGysXeY92lbbcJq_R7tdt0kPvbPaYk2VsUTN0JLFexZ7C5WJGEqn2bipi9Oj0mksriVKV5o',
+  apiUrl:'https://api.minimaxi.com/v1/chat/completions',
+  model:'MiniMax-M2.7'
+};
+function createTaskId(){taskIdSeed+=1;return `task_${taskIdSeed}_${Math.random().toString(36).slice(2,8)}`;}
+function ensureTaskId(task){if(!task.id) task.id=createTaskId();return task.id;}
+function switchPage(index){currentPage=index;document.getElementById('mainWrapper').style.transform=`translateX(-${index*100}vw)`;document.querySelector('.left-btn').style.display=index===0?'none':'flex';document.querySelector('.right-btn').style.display=index===0?'flex':'none'}
+function renderCategories(){
+  const c=document.getElementById('categoryList');
+  c.innerHTML='';
+
+  categories.forEach((cat,index)=>{
+    const d=document.createElement('div');
+    d.className='editable-chip';
+    d.innerHTML=`<span>${cat}</span><button class="chip-close" onclick="removeCategory(${index})">×</button>`;
+    c.appendChild(d);
+  });
+}
+
+function addCategory(){
+  const input=document.getElementById('newCategory');
+  const value=input.value.trim();
+
+  if(value && !categories.includes(value)){
+    categories.push(value);
+    input.value='';
+    renderCategories();
+    renderQuadrants();
+    renderCalendar();
+  }
+}
+
+function removeCategory(index){
+  const removed=categories[index];
+  categories.splice(index,1);
+
+  tasks.forEach(task=>{
+    if(task.category===removed){
+      task.category=categories[0] || '未分类';
+    }
+  });
+
+  renderCategories();
+  renderQuadrants();
+  renderCalendar();
+}
+
+function renderBreakKeywords(){
+  const c=document.getElementById('breakKeywordList');
+  if(!c) return;
+  c.innerHTML='';
+
+  breakKeywords.forEach((kw,index)=>{
+    const d=document.createElement('div');
+    d.className='editable-chip';
+    d.innerHTML=`<span>${kw}</span><button class="chip-close" onclick="removeBreakKeyword(${index})">×</button>`;
+    c.appendChild(d);
+  });
+}
+
+function addBreakKeyword(){
+  const input=document.getElementById('newBreakKeyword');
+  if(!input) return;
+
+  const value=input.value.trim();
+  if(!value) return;
+
+  if(!breakKeywords.includes(value)){
+    breakKeywords.push(value);
+  }
+
+  input.value='';
+  renderBreakKeywords();
+}
+
+function removeBreakKeyword(index){
+  breakKeywords.splice(index,1);
+  renderBreakKeywords();
+}
+
+const ocrTextarea=document.getElementById('ocrText');ocrTextarea.addEventListener('scroll',()=>{ocrTextarea.classList.add('scrolling');clearTimeout(scrollTimeout);scrollTimeout=setTimeout(()=>ocrTextarea.classList.remove('scrolling'),3000)});
+const imageInput=document.getElementById('imageInput');
+const batchImageInput=document.getElementById('batchImageInput');
+
+// 关键修复：同一张图片再次选择时，浏览器不会触发 change。
+// 在打开文件选择器前先清空 input.value，可避免“取消裁剪/关闭裁剪后再次选同图不弹窗”。
+imageInput.addEventListener('click',()=>{
+  imageInput.value='';
+});
+
+imageInput.addEventListener('change',e=>{
+  const file=e.target.files && e.target.files[0];
+  if(!file) return;
+
+  if(currentObjectURL){
+    URL.revokeObjectURL(currentObjectURL);
+    currentObjectURL=null;
+  }
+
+  currentObjectURL=URL.createObjectURL(file);
+  document.getElementById('cropModal').classList.remove('hidden');
+  const cropImage=document.getElementById('cropImage');
+  cropImage.src=currentObjectURL;
+
+  cropImage.onload=()=>{
+    if(cropper) cropper.destroy();
+    cropper=new Cropper(cropImage,{viewMode:1,dragMode:'move',autoCropArea:1,responsive:true,background:false});
+  };
+});
+
+if(batchImageInput){
+  batchImageInput.addEventListener('click',()=>{batchImageInput.value='';});
+  batchImageInput.addEventListener('change',e=>{
+    const files=Array.from(e.target.files||[]).filter(file=>/^image\//.test(file.type));
+    if(files.length) processBatchImages(files);
+  });
+}
+
+function setAutoCropButtonState(state){
+  const btn=document.getElementById('autoCropBtn');
+  if(!btn) return;
+  btn.disabled=state==='busy';
+  btn.classList.toggle('opacity-50',state==='busy');
+  btn.classList.toggle('ring-2',state==='hit');
+  btn.classList.toggle('ring-cyan-300',state==='hit');
+  if(state==='hit'){
+    setTimeout(()=>setAutoCropButtonState('idle'),700);
+  }
+}
+
+function prepareCropImageData(image){
+  const naturalWidth=image.naturalWidth;
+  const naturalHeight=image.naturalHeight;
+  if(!naturalWidth || !naturalHeight) return null;
+
+  const scale=Math.min(1,900/naturalWidth,1400/naturalHeight);
+  const width=Math.max(1,Math.round(naturalWidth*scale));
+  const height=Math.max(1,Math.round(naturalHeight*scale));
+  const canvas=document.createElement('canvas');
+  canvas.width=width;
+  canvas.height=height;
+  const ctx=canvas.getContext('2d',{willReadFrequently:true});
+  ctx.drawImage(image,0,0,width,height);
+
+  return {
+    naturalWidth,
+    naturalHeight,
+    scale,
+    width,
+    height,
+    pixels:ctx.getImageData(0,0,width,height).data
+  };
+}
+
+function cropBoundsFromScaledBox(box,data,padRatioX=.025,padRatioY=.025){
+  const padX=Math.max(8,Math.round(box.boxWidth*padRatioX));
+  const padY=Math.max(8,Math.round(box.boxHeight*padRatioY));
+  const x=Math.max(0,(box.minX-padX)/data.scale);
+  const y=Math.max(0,(box.minY-padY)/data.scale);
+  const right=Math.min(data.naturalWidth,(box.maxX+padX)/data.scale);
+  const bottom=Math.min(data.naturalHeight,(box.maxY+padY)/data.scale);
+
+  return {
+    x,
+    y,
+    width:Math.max(40,right-x),
+    height:Math.max(40,bottom-y),
+    score:box.score || 0,
+    kind:box.kind || 'rect'
+  };
+}
+
+function getCropPixelKey(pixels,index){
+  const p=index*4;
+  const a=pixels[p+3];
+  if(a < 245) return -1;
+  const r=pixels[p];
+  const g=pixels[p+1];
+  const b=pixels[p+2];
+
+  return ((r >> 4) << 8) | ((g >> 4) << 4) | (b >> 4);
+}
+
+function colorDistanceSq(pixels,index,r,g,b){
+  const p=index*4;
+  const dr=pixels[p]-r;
+  const dg=pixels[p+1]-g;
+  const db=pixels[p+2]-b;
+  return dr*dr+dg*dg+db*db;
+}
+
+function scoreRectCandidate(candidate,width,height){
+  const {minX,minY,maxX,maxY,count,boxWidth,boxHeight,seedR,seedG,seedB} = candidate;
+  const boxArea=boxWidth*boxHeight;
+  const density=count/boxArea;
+  if(density < 0.34) return 0;
+
+  const centerX=minX+boxWidth/2;
+  const centerY=minY+boxHeight/2;
+  const centerBias=1-Math.min(Math.abs(centerX-width/2)/(width/2),0.58);
+  const topPenalty=minY<height*0.08?0.45:1;
+  const bottomPenalty=maxY>height*0.93?0.46:1;
+  const edgePenalty=(minX<width*0.02 || maxX>width*0.98)?0.35:1;
+  const widthPenalty=boxWidth>width*0.9?0.28:1;
+  const heightPenalty=boxHeight>height*0.78?0.62:1;
+  const colorfulness=Math.max(seedR,seedG,seedB)-Math.min(seedR,seedG,seedB);
+  const colorBoost=colorfulness>18?1.08:1;
+  const verticalBoost=centerY>height*0.1 && centerY<height*0.9 ? 1 : 0.7;
+
+  return boxArea*Math.pow(density,1.25)*centerBias*topPenalty*bottomPenalty*edgePenalty*widthPenalty*heightPenalty*colorBoost*verticalBoost;
+}
+
+function detectColoredRectangleBoundsFromData(data){
+  if(!data) return null;
+  const {width,height,pixels}=data;
+  const visited=new Uint8Array(width*height);
+  const stack=new Int32Array(width*height);
+  const minWidth=width*0.22;
+  const minHeight=height*0.055;
+  const maxWidth=width*0.92;
+  const minArea=width*height*0.012;
+  const maxColorDistance=38*38;
+  let best=null;
+
+  for(let index=0;index<visited.length;index++){
+    if(visited[index]) continue;
+    const seedKey=getCropPixelKey(pixels,index);
+    if(seedKey < 0){
+      visited[index]=1;
+      continue;
+    }
+
+    const seedP=index*4;
+    const seedR=pixels[seedP];
+    const seedG=pixels[seedP+1];
+    const seedB=pixels[seedP+2];
+    let top=0;
+    let count=0;
+    let minX=width;
+    let minY=height;
+    let maxX=0;
+    let maxY=0;
+    stack[top++]=index;
+    visited[index]=1;
+
+    while(top){
+      const current=stack[--top];
+      const x=current%width;
+      const y=(current-x)/width;
+      count++;
+      if(x<minX) minX=x;
+      if(x>maxX) maxX=x;
+      if(y<minY) minY=y;
+      if(y>maxY) maxY=y;
+
+      const left=current-1;
+      const right=current+1;
+      const up=current-width;
+      const down=current+width;
+
+      if(x>0 && !visited[left] && getCropPixelKey(pixels,left)===seedKey && colorDistanceSq(pixels,left,seedR,seedG,seedB)<=maxColorDistance){visited[left]=1;stack[top++]=left;}
+      if(x<width-1 && !visited[right] && getCropPixelKey(pixels,right)===seedKey && colorDistanceSq(pixels,right,seedR,seedG,seedB)<=maxColorDistance){visited[right]=1;stack[top++]=right;}
+      if(y>0 && !visited[up] && getCropPixelKey(pixels,up)===seedKey && colorDistanceSq(pixels,up,seedR,seedG,seedB)<=maxColorDistance){visited[up]=1;stack[top++]=up;}
+      if(y<height-1 && !visited[down] && getCropPixelKey(pixels,down)===seedKey && colorDistanceSq(pixels,down,seedR,seedG,seedB)<=maxColorDistance){visited[down]=1;stack[top++]=down;}
+    }
+
+    const boxWidth=maxX-minX+1;
+    const boxHeight=maxY-minY+1;
+    const boxArea=boxWidth*boxHeight;
+    if(boxWidth<minWidth || boxHeight<minHeight || boxWidth>maxWidth || boxArea<minArea) continue;
+
+    const density=count/boxArea;
+    if(density<0.34) continue;
+
+    const candidate={minX,minY,maxX,maxY,count,boxWidth,boxHeight,seedR,seedG,seedB,kind:'rect'};
+    const score=scoreRectCandidate(candidate,width,height);
+    if(!score) continue;
+
+    if(!best || score>best.score){
+      best={...candidate,score};
+    }
+  }
+
+  if(!best) return null;
+  return cropBoundsFromScaledBox(best,data,.025,.025);
+}
+
+function isNoticeTextPixel(pixels,index){
+  const p=index*4;
+  const a=pixels[p+3];
+  if(a < 245) return false;
+  const r=pixels[p];
+  const g=pixels[p+1];
+  const b=pixels[p+2];
+  const max=Math.max(r,g,b);
+  const min=Math.min(r,g,b);
+  const luma=.299*r+.587*g+.114*b;
+  const saturation=max-min;
+
+  if(luma < 168) return true;
+  return saturation > 38 && luma < 225 && (b > r + 18 || g > r + 12);
+}
+
+function mergeLineGroups(groups,maxGap){
+  const merged=[];
+  groups.forEach(group=>{
+    const last=merged[merged.length-1];
+    if(last && group.start-last.end<=maxGap){
+      last.end=group.end;
+      last.count+=group.count;
+    }else{
+      merged.push({...group});
+    }
+  });
+  return merged;
+}
+
+function detectTextNoticeBoundsFromData(data){
+  if(!data) return null;
+  const {width,height,pixels}=data;
+  const rowCounts=new Uint16Array(height);
+  const colCounts=new Uint16Array(width);
+  const topLimit=Math.round(height*0.09);
+  const bottomLimit=Math.round(height*0.88);
+  const leftLimit=Math.round(width*0.025);
+  const rightLimit=Math.round(width*0.975);
+
+  for(let y=topLimit;y<bottomLimit;y++){
+    let rowCount=0;
+    for(let x=leftLimit;x<rightLimit;x++){
+      const index=y*width+x;
+      if(isNoticeTextPixel(pixels,index)){
+        rowCount++;
+        colCounts[x]++;
+      }
+    }
+    rowCounts[y]=rowCount;
+  }
+
+  const smoothRows=new Float32Array(height);
+  for(let y=topLimit;y<bottomLimit;y++){
+    let sum=0;
+    for(let k=-4;k<=4;k++){
+      const yy=y+k;
+      if(yy>=0 && yy<height) sum+=rowCounts[yy];
+    }
+    smoothRows[y]=sum/9;
+  }
+
+  const rowThreshold=Math.max(5,width*0.006);
+  const rawGroups=[];
+  let active=null;
+  for(let y=topLimit;y<bottomLimit;y++){
+    if(smoothRows[y]>rowThreshold){
+      if(!active) active={start:y,end:y,count:0};
+      active.end=y;
+      active.count+=rowCounts[y];
+    }else if(active){
+      rawGroups.push(active);
+      active=null;
+    }
+  }
+  if(active) rawGroups.push(active);
+
+  const groups=mergeLineGroups(rawGroups,Math.max(12,Math.round(height*0.012)))
+    .filter(group=>group.end-group.start>=5 && group.count>width*0.02);
+
+  if(!groups.length) return null;
+
+  let startIndex=0;
+  while(startIndex<groups.length-1 && groups[startIndex].end<height*0.11) startIndex++;
+
+  let endIndex=startIndex;
+  for(let i=startIndex+1;i<groups.length;i++){
+    const gap=groups[i].start-groups[i-1].end;
+    if(gap>height*0.16) break;
+    endIndex=i;
+  }
+
+  const minY=groups[startIndex].start;
+  const maxY=groups[endIndex].end;
+  const colThreshold=Math.max(3,(maxY-minY)*0.006);
+  let minX=width;
+  let maxX=0;
+
+  for(let x=leftLimit;x<rightLimit;x++){
+    let count=0;
+    for(let y=minY;y<=maxY;y++){
+      if(isNoticeTextPixel(pixels,y*width+x)) count++;
+    }
+    if(count>colThreshold){
+      if(x<minX) minX=x;
+      if(x>maxX) maxX=x;
+    }
+  }
+
+  if(minX>=maxX) return null;
+
+  const boxWidth=maxX-minX+1;
+  const boxHeight=maxY-minY+1;
+  if(boxWidth<width*0.35 || boxHeight<height*0.08) return null;
+
+  return cropBoundsFromScaledBox({
+    minX,
+    minY,
+    maxX,
+    maxY,
+    boxWidth,
+    boxHeight,
+    score:boxWidth*boxHeight,
+    kind:'text'
+  },data,.055,.045);
+}
+
+function detectSmartNoticeBounds(image){
+  const data=prepareCropImageData(image);
+  const rectBounds=detectColoredRectangleBoundsFromData(data);
+  const textBounds=detectTextNoticeBoundsFromData(data);
+
+  if(rectBounds && (!textBounds || rectBounds.height>data.naturalHeight*0.12 || rectBounds.width*rectBounds.height>textBounds.width*textBounds.height*.38)){
+    return rectBounds;
+  }
+  return textBounds || rectBounds;
+}
+
+function detectWhiteBubbleBounds(image){
+  return detectSmartNoticeBounds(image);
+}
+
+function autoCropWhiteBubble(){
+  if(!cropper) return;
+  const image=document.getElementById('cropImage');
+  if(!image || !image.complete) return;
+
+  setAutoCropButtonState('busy');
+  requestAnimationFrame(()=>{
+    try{
+      const bounds=detectWhiteBubbleBounds(image);
+      if(bounds){
+        cropper.setData(bounds);
+        setAutoCropButtonState('hit');
+      }else{
+        setAutoCropButtonState('idle');
+      }
+    }catch(err){
+      setAutoCropButtonState('idle');
+    }
+  });
+}
+
+function applyCrop(){if(!cropper)return;const canvas=cropper.getCroppedCanvas({maxWidth:1200,maxHeight:1200,fillColor:'#ffffff'});const croppedImage=canvas.toDataURL('image/png');document.getElementById('previewImage').src=croppedImage;document.getElementById('previewImage').classList.remove('hidden');document.getElementById('emptyPreview').style.display='none';document.getElementById('removeImageBtn').classList.remove('hidden');closeCropper();document.getElementById('ocrText').value='OCR识别中，请稍候...\n已自动压缩为 JPG 格式以提高接口稳定性。';canvas.toBlob(blob=>{croppedBlob=blob;realOCR(blob)},'image/jpeg',0.92)}
+function closeCropper(){document.getElementById('cropModal').classList.add('hidden');if(cropper){cropper.destroy();cropper=null}const cropImage=document.getElementById('cropImage');cropImage.onload=null;cropImage.src='';if(currentObjectURL){URL.revokeObjectURL(currentObjectURL);currentObjectURL=null;}imageInput.value=''}function removeImage(){document.getElementById('previewImage').src='';document.getElementById('previewImage').classList.add('hidden');document.getElementById('removeImageBtn').classList.add('hidden');document.getElementById('emptyPreview').style.display='flex';document.getElementById('ocrText').value='';imageInput.value='';croppedBlob=null}
+function escapeRegExp(str){
+  return str.replace(/[.*+?^${}()|[\]\\]/g,'\\$&');
+}
+
+function getAllBreakKeywords(){
+  return [...new Set([
+    ...(breakKeywords || []),
+    '报名链接','报名截止时间','提交截止时间','截止日期','截止时间',
+    '报名截止','提交截止','缴费截止','申请截止','填写截止',
+    '开始时间','结束时间','集合时间','返回时间','活动时间',
+    '地点','链接','网址','补充','备注','说明','要求'
+  ].map(x=>String(x||'').trim()).filter(Boolean))]
+    .sort((a,b)=>b.length-a.length);
+}
+
+function isBreakKeywordLine(line){
+  const text = String(line || '').trim();
+  if(!text) return false;
+  const kw = getAllBreakKeywords().map(escapeRegExp).join('|');
+  if(!kw) return false;
+  return new RegExp(`^(?:${kw})(?:\\s*[:：]|(?=\\s*(?:https?:\\/\\/|www\\.|\\d|[年月日号]|上午|下午|晚上|中午))|$)`).test(text);
+}
+
+function isUrlLikeLine(line){
+  return /^(?:https?:\/\/|www\.|docs\.qq\.com|kdocs\.cn|pan\.baidu\.com|meeting\.tencent\.com|wj\.qq\.com)/i.test(String(line||'').trim());
+}
+
+function isStandaloneMetaLine(line){
+  const text = String(line || '').trim();
+  if(!text) return true;
+  if(isBreakKeywordLine(text) || isUrlLikeLine(text)) return true;
+  if(getAllBreakKeywords().includes(text)) return true;
+  if(/^【[^】]+】$/.test(text)) return true;
+  return false;
+}
+
+function normalizeOCRLine(line){
+  return String(line || '')
+    .replace(/[\u3000\t]+/g,' ')
+    .replace(/\s*([:：])\s*/g,'$1')
+    .replace(/\s*([-~至到])\s*/g,'$1')
+    .replace(/(上午|下午|晚上|中午)\s+(\d{1,2})/g,'$1$2')
+    .replace(/\s+/g,' ')
+    .replace(/^[，。；;、]+|[，。；;、]+$/g,'')
+    .trim();
+}
+
+function insertBreaksByKeywords(text){
+  let value = String(text || '')
+    .replace(/\r/g,'\n')
+    .replace(/[－—–]/g,'-')
+    .replace(/([^\s\n])(https?:\/\/|www\.)/ig,'$1\n$2')
+    .replace(/((?:https?:\/\/|www\.)[^\s\n]+)\s*\n\s*(\/[A-Za-z0-9._~:/?#[\]@!$&'()*+,;=%-]+)/g,'$1$2')
+    .replace(/(报名截止|提交截止|缴费截止|申请截止|填写截止)\s*\n\s*(时间|日期)/g,'$1$2');
+
+  getAllBreakKeywords().forEach(keyword=>{
+    const k = escapeRegExp(keyword);
+    value = value.replace(new RegExp(`([^\\n])(${k})\\s*([:：])`,'g'),'$1\n$2$3');
+
+    if(/时间|截止|日期|地点|集合|返回|报名|签到|链接|网址|补充|备注|说明|要求/.test(keyword)){
+      value = value.replace(
+        new RegExp(`([^\\n])(${k})(?=\\s*(?:https?:\\/\\/|www\\.|\\d{1,2}[:：点月日号]|上午|下午|晚上|中午|时间|日期))`,'g'),
+        '$1\n$2'
+      );
+    }
+  });
+
+  return value;
+}
+
+function shouldJoinOCRLine(prev,next){
+  const p = String(prev || '').trim();
+  const n = String(next || '').trim();
+  if(!p || !n) return false;
+  if(isUrlLikeLine(p) && /^\/[A-Za-z0-9]/.test(n)) return true;
+  if(getAllBreakKeywords().includes(p) && isBreakKeywordLine(n)) return true;
+  if(isStandaloneMetaLine(p) || isStandaloneMetaLine(n)) return false;
+  if(/[。！？!?；;]$/.test(p)) return false;
+  if(isLikelyNoticeStart(n)) return false;
+  if(/^[，。；;、]/.test(n)) return true;
+  if(/[，、]$/.test(p)) return true;
+  return true;
+}
+
+function mergeStandaloneActionLines(text){
+  const actionRe = /^(报名|签到|提交|缴费|填写|登记|申请)$/;
+  const lines = String(text || '')
+    .split('\n')
+    .map(normalizeOCRLine)
+    .filter(Boolean);
+  const merged = [];
+
+  lines.forEach(line=>{
+    const last = merged[merged.length - 1] || '';
+    if(
+      actionRe.test(line) &&
+      last &&
+      !isBreakKeywordLine(last) &&
+      !isUrlLikeLine(last) &&
+      !/[。！？!?；;]$/.test(last)
+    ){
+      merged[merged.length - 1] = `${last}${line}`;
+    }else{
+      merged.push(line);
+    }
+  });
+
+  return merged.join('\n');
+}
+
+function formatOCRText(text){
+  const raw = insertBreaksByKeywords(text);
+  if(!String(raw || '').trim()) return '';
+
+  const sourceLines = raw
+    .split('\n')
+    .map(normalizeOCRLine)
+    .filter(Boolean);
+
+  const mergedLines = [];
+  sourceLines.forEach(line=>{
+    const last = mergedLines[mergedLines.length - 1];
+    if(shouldJoinOCRLine(last,line)){
+      mergedLines[mergedLines.length - 1] = normalizeOCRLine(`${last}${line}`);
+    }else{
+      mergedLines.push(line);
+    }
+  });
+
+  let secondPass = insertBreaksByKeywords(mergedLines.join('\n'));
+  secondPass = secondPass
+    .replace(/(报名|提交|缴费|申请|填写)\s*\n\s*截止\s*\n\s*(时间|日期)/g,'$1截止$2')
+    .replace(/(报名|提交|缴费|申请|填写)\s*\n\s*截止(?=\s*(?:\d|上午|下午|晚上|中午))/g,'$1截止')
+    .replace(/([^\n])(报名截止(?:时间|日期)?|提交截止(?:时间|日期)?|缴费截止(?:时间|日期)?|申请截止(?:时间|日期)?|填写截止(?:时间|日期)?)/g,'$1\n$2');
+  secondPass = mergeStandaloneActionLines(secondPass);
+
+  return secondPass
+    .split('\n')
+    .map(normalizeOCRLine)
+    .filter(Boolean)
+    .join('\n')
+    .replace(/\n{2,}/g,'\n')
+    .trim();
+}
+
+const XUNFEI_CONFIG={
+  appId:'28c3d6f8',
+  apiKey:'c0ad5f0834c0e4d65b594c6845a8a08f',
+  apiSecret:'MGQ3MmQwYjcxOWZmMThjZTZlYzViM2Uy',
+  apiUrl:'https://api.xf-yun.com/v1/private/sf8e6aca1',
+  host:'api.xf-yun.com',
+  category:'ch_en_public_cloud'
+};
+
+function assertXunfeiConfig(){
+  const missing=Object.entries(XUNFEI_CONFIG)
+    .filter(([key,value])=>key!=='category'&&(!value||String(value).startsWith('__')))
+    .map(([key])=>key);
+  if(missing.length){
+    throw new Error(`缺少讯飞配置：${missing.join('、')}`);
+  }
+}
+
+function bytesToBase64(bytes){
+  let binary='';
+  const chunkSize=0x8000;
+  for(let i=0;i<bytes.length;i+=chunkSize){
+    binary+=String.fromCharCode(...bytes.subarray(i,i+chunkSize));
+  }
+  return btoa(binary);
+}
+
+function base64ToUtf8(base64){
+  const binary=atob(base64);
+  const bytes=new Uint8Array(binary.length);
+  for(let i=0;i<binary.length;i++) bytes[i]=binary.charCodeAt(i);
+  return new TextDecoder('utf-8').decode(bytes);
+}
+
+async function hmacSha256Base64(secret,message){
+  if(!window.crypto||!window.crypto.subtle){
+    throw new Error('当前浏览器不支持 Web Crypto，无法生成讯飞签名。请用新版 Chrome/Edge 打开此页面。');
+  }
+  const encoder=new TextEncoder();
+  const key=await crypto.subtle.importKey(
+    'raw',
+    encoder.encode(secret),
+    {name:'HMAC',hash:'SHA-256'},
+    false,
+    ['sign']
+  );
+  const signature=await crypto.subtle.sign('HMAC',key,encoder.encode(message));
+  return bytesToBase64(new Uint8Array(signature));
+}
+
+async function buildXunfeiAuthUrl(){
+  assertXunfeiConfig();
+  const url=new URL(XUNFEI_CONFIG.apiUrl);
+  const requestPath=url.pathname;
+  const date=new Date().toUTCString();
+  const signatureOrigin=`host: ${XUNFEI_CONFIG.host}\ndate: ${date}\nPOST ${requestPath} HTTP/1.1`;
+  const signature=await hmacSha256Base64(XUNFEI_CONFIG.apiSecret,signatureOrigin);
+  const authorizationOrigin=`api_key="${XUNFEI_CONFIG.apiKey}", algorithm="hmac-sha256", headers="host date request-line", signature="${signature}"`;
+  url.searchParams.set('authorization',btoa(authorizationOrigin));
+  url.searchParams.set('host',XUNFEI_CONFIG.host);
+  url.searchParams.set('date',date);
+  return url.toString();
+}
+
+function blobToBase64(blob){
+  return new Promise((resolve,reject)=>{
+    const reader=new FileReader();
+    reader.onload=()=>resolve(String(reader.result||'').split(',')[1]||'');
+    reader.onerror=()=>reject(reader.error||new Error('图片读取失败'));
+    reader.readAsDataURL(blob);
+  });
+}
+
+function getImageEncoding(blob){
+  const type=String(blob&&blob.type||'').toLowerCase();
+  if(type.includes('png')) return 'png';
+  if(type.includes('bmp')) return 'bmp';
+  if(type.includes('webp')) return 'webp';
+  return 'jpg';
+}
+
+function extractXunfeiText(result){
+  const header=result&&result.header?result.header:{};
+  if(Number(header.code)!==0){
+    throw new Error(`讯飞 OCR 识别失败：code=${header.code??'unknown'}，message=${header.message||'未知错误'}`);
+  }
+
+  const resultText=result&&result.payload&&result.payload.result&&result.payload.result.text;
+  if(!resultText) return {text:'',lines:[]};
+
+  const data=JSON.parse(base64ToUtf8(resultText));
+  const lines=[];
+  (data.pages||[]).forEach(page=>{
+    (page.lines||[]).forEach(line=>{
+      const lineText=(line.words||[]).map(word=>word.content||'').join('').trim();
+      if(lineText) lines.push(lineText);
+    });
+  });
+
+  return {text:lines.join('\n'),lines};
+}
+
+async function ocrImageBlob(blob){
+  const image=await blobToBase64(blob);
+  const requestUrl=await buildXunfeiAuthUrl();
+  const res=await fetch(requestUrl,{
+    method:'POST',
+    headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({
+      header:{app_id:XUNFEI_CONFIG.appId,status:3},
+      parameter:{
+        sf8e6aca1:{
+          category:XUNFEI_CONFIG.category,
+          result:{encoding:'utf8',compress:'raw',format:'json'}
+        }
+      },
+      payload:{
+        sf8e6aca1_data_1:{
+          encoding:getImageEncoding(blob),
+          status:3,
+          image
+        }
+      }
+    })
+  });
+  const data=await res.json().catch(()=>({}));
+  if(!res.ok){
+    throw new Error(`讯飞 OCR 请求失败：HTTP ${res.status} ${res.statusText}`);
+  }
+  const extracted=extractXunfeiText(data);
+  return extracted.text||'';
+}
+
+async function realOCR(blob){
+  const textarea=document.getElementById('ocrText');
+  try{
+    textarea.value=await ocrImageBlob(blob)||'未识别到文字';
+  }catch(err){
+    textarea.value=`OCR识别失败：${err&&err.message?err.message:err}`;
+  }
+}
+
+function setBatchProgress(current,total,status=''){
+  const progress=document.getElementById('batchProgress');
+  if(progress){
+    progress.textContent=total?`${current} / ${total}${status?` ${status}`:''}`:'';
+  }
+  const btn=document.getElementById('batchImportBtn');
+  if(btn){
+    btn.classList.toggle('opacity-60',Boolean(total));
+    btn.classList.toggle('pointer-events-none',Boolean(total));
+  }
+}
+
+function imageFileToJpegBlob(file,maxSize=1400){
+  return new Promise((resolve,reject)=>{
+    const url=URL.createObjectURL(file);
+    const img=new Image();
+    img.onload=()=>{
+      try{
+        const scale=Math.min(1,maxSize/img.naturalWidth,maxSize/img.naturalHeight);
+        const width=Math.max(1,Math.round(img.naturalWidth*scale));
+        const height=Math.max(1,Math.round(img.naturalHeight*scale));
+        const canvas=document.createElement('canvas');
+        canvas.width=width;
+        canvas.height=height;
+        const ctx=canvas.getContext('2d');
+        ctx.fillStyle='#fff';
+        ctx.fillRect(0,0,width,height);
+        ctx.drawImage(img,0,0,width,height);
+        canvas.toBlob(blob=>{
+          URL.revokeObjectURL(url);
+          blob?resolve(blob):reject(new Error('图片压缩失败'));
+        },'image/jpeg',0.92);
+      }catch(err){
+        URL.revokeObjectURL(url);
+        reject(err);
+      }
+    };
+    img.onerror=()=>{
+      URL.revokeObjectURL(url);
+      reject(new Error(`图片读取失败：${file.name}`));
+    };
+    img.src=url;
+  });
+}
+
+function canvasToBlob(canvas,type='image/jpeg',quality=.92){
+  return new Promise((resolve,reject)=>{
+    canvas.toBlob(blob=>{
+      if(blob) resolve(blob);
+      else reject(new Error('图片压缩失败'));
+    },type,quality);
+  });
+}
+
+function loadImageFile(file){
+  return new Promise((resolve,reject)=>{
+    const url=URL.createObjectURL(file);
+    const image=new Image();
+    image.onload=()=>resolve({image,url});
+    image.onerror=()=>{
+      URL.revokeObjectURL(url);
+      reject(new Error(`图片读取失败：${file.name}`));
+    };
+    image.src=url;
+  });
+}
+
+function clampCropBounds(bounds,image){
+  const naturalWidth=image.naturalWidth || image.width;
+  const naturalHeight=image.naturalHeight || image.height;
+  const source=bounds || {x:0,y:0,width:naturalWidth,height:naturalHeight};
+  const x=Math.max(0,Math.min(source.x || 0,naturalWidth-1));
+  const y=Math.max(0,Math.min(source.y || 0,naturalHeight-1));
+  const right=Math.max(x+1,Math.min((source.x || 0)+(source.width || naturalWidth),naturalWidth));
+  const bottom=Math.max(y+1,Math.min((source.y || 0)+(source.height || naturalHeight),naturalHeight));
+  return {x,y,width:right-x,height:bottom-y};
+}
+
+async function createAutoCroppedOCRBlob(file,maxSize=1400){
+  const {image,url}=await loadImageFile(file);
+  try{
+    let bounds=null;
+    try{
+      bounds=detectSmartNoticeBounds(image);
+    }catch(err){
+      bounds=null;
+    }
+
+    const crop=clampCropBounds(bounds,image);
+    const scale=Math.min(1,maxSize/crop.width,maxSize/crop.height);
+    const canvas=document.createElement('canvas');
+    canvas.width=Math.max(1,Math.round(crop.width*scale));
+    canvas.height=Math.max(1,Math.round(crop.height*scale));
+    const ctx=canvas.getContext('2d');
+    ctx.fillStyle='#ffffff';
+    ctx.fillRect(0,0,canvas.width,canvas.height);
+    ctx.drawImage(image,crop.x,crop.y,crop.width,crop.height,0,0,canvas.width,canvas.height);
+
+    return {
+      blob:await canvasToBlob(canvas,'image/jpeg',.92),
+      preview:canvas.toDataURL('image/png'),
+      bounds
+    };
+  }finally{
+    URL.revokeObjectURL(url);
+  }
+}
+
+
+let batchFallbackDecisionResolver=null;
+function showBatchFallbackDecision({fileName,index,total,warning,cleaned}){
+  return new Promise(resolve=>{
+    batchFallbackDecisionResolver=resolve;
+    const modal=document.getElementById('batchFallbackModal');
+    const meta=document.getElementById('batchFallbackMeta');
+    const preview=document.getElementById('batchFallbackPreview');
+    if(meta) meta.textContent=`${index} / ${total} · ${fileName} · ${warning || '检测到表格内容，但无法拆出可用日程'}`;
+    if(preview) preview.textContent=String(cleaned || '').slice(0,1600) || '无可预览文本';
+    if(modal) modal.classList.remove('hidden');
+  });
+}
+function resolveBatchFallbackDecision(action){
+  const modal=document.getElementById('batchFallbackModal');
+  if(modal) modal.classList.add('hidden');
+  if(batchFallbackDecisionResolver){
+    const resolver=batchFallbackDecisionResolver;
+    batchFallbackDecisionResolver=null;
+    resolver(action);
+  }
+}
+
+async function processBatchImages(files){
+  const textarea=document.getElementById('ocrText');
+  const total=files.length;
+  const imported=[];
+  const logs=[];
+
+  pendingTasks=[];
+  pendingAddMode='normal';
+  document.getElementById('confirmBtn').innerText='确认添加';
+  document.getElementById('confirmBtn').classList.add('opacity-40','pointer-events-none');
+
+  for(let i=0;i<total;i++){
+    const file=files[i];
+    setBatchProgress(i+1,total,'处理中');
+    textarea.value=`批量导入中：${i+1} / ${total}\n${file.name}\n\n正在进行 OCR 识别、版式判别和日程解析...`;
+
+    try{
+      const {blob,preview,bounds}=await createAutoCroppedOCRBlob(file);
+      if(preview){
+        document.getElementById('previewImage').src=preview;
+        document.getElementById('previewImage').classList.remove('hidden');
+        document.getElementById('emptyPreview').style.display='none';
+        document.getElementById('removeImageBtn').classList.remove('hidden');
+      }
+      const rawText=await ocrImageBlob(blob);
+      const cleaned=await cleanOCRText(rawText);
+      const cleanMode=window.lastCleanDecision&&window.lastCleanDecision.mode==='minimax'?'MiniMax表格清洗':'本地简单清洗';
+
+      pendingAddMode='normal';
+      const parsed=parseTasksFromCleanText(cleaned,{allowBlockedTableFallback:true});
+      const needsManualDecision=pendingAddMode==='continue' && parsed.length>0 && lastParseWarning;
+
+      if(needsManualDecision){
+        textarea.value=`批量导入暂停：${i+1} / ${total}\n${file.name}\n\n【解析提示】${lastParseWarning}\n\n请在弹窗中选择“继续添加”或“跳过”。\n\n${cleaned}`;
+        setBatchProgress(i+1,total,'等待手动选择');
+        const decision=await showBatchFallbackDecision({
+          fileName:file.name,
+          index:i+1,
+          total,
+          warning:lastParseWarning,
+          cleaned
+        });
+
+        if(decision==='continue'){
+          parsed.forEach(ensureTaskId);
+          imported.push(...parsed);
+          logs.push(`【${file.name}】${bounds?'已自动裁剪':'未检测到裁剪区域，已使用整图'}；${cleanMode}；表格拆分失败，用户选择继续添加兜底日程 1 条；${lastParseWarning}\n${cleaned}`);
+        }else{
+          logs.push(`【${file.name}】${bounds?'已自动裁剪':'未检测到裁剪区域，已使用整图'}；${cleanMode}；表格拆分失败，用户选择跳过；${lastParseWarning}\n${cleaned}`);
+        }
+        pendingAddMode='normal';
+      }else{
+        parsed.forEach(ensureTaskId);
+        imported.push(...parsed);
+        logs.push(`【${file.name}】${bounds?'已自动裁剪':'未检测到裁剪区域，已使用整图'}；${cleanMode}；识别 ${parsed.length} 条日程${lastParseWarning?`；${lastParseWarning}`:''}\n${cleaned}`);
+      }
+    }catch(err){
+      logs.push(`【${file.name}】处理失败：${err&&err.message?err.message:err}`);
+    }
+  }
+
+  if(imported.length){
+    tasks.push(...imported);
+    renderQuadrants();
+    renderCalendar();
+  }
+
+  pendingTasks=[];
+  textarea.value=`批量导入完成：${total} / ${total}\n新增日程：${imported.length} 条\n\n${logs.join('\n\n')}`;
+  setBatchProgress(total,total,'完成');
+  setTimeout(()=>setBatchProgress(0,0),1800);
+}
+async function analyzeText(mode='single'){
+  const singleBtn=document.getElementById('singleScheduleBtn');
+  const multiBtn=document.getElementById('multiScheduleBtn');
+  const activeBtn=mode==='multi'?multiBtn:singleBtn;
+  if(singleBtn) singleBtn.disabled=true;
+  if(multiBtn) multiBtn.disabled=true;
+  if(activeBtn) activeBtn.innerText=mode==='multi'?'多日程分析中…':'单日程分析中…';
+
+  const textarea=document.getElementById('ocrText');
+  const text=textarea.value;
+  pendingTasks=[];
+  pendingAddMode='normal';
+
+  if(!text.trim()){
+    finishAnalyze();
+    return;
+  }
+
+  try{
+    if(mode==='multi'){
+      const normalized=await cleanOCRTextAsMultiSchedule(text);
+      const cleanMode=window.lastCleanDecision&&window.lastCleanDecision.mode==='minimax'
+        ?'MiniMax多日程清洗'
+        :'本地多日程解析';
+      textarea.value=`【清洗方式】${cleanMode}
+${normalized}`;
+      buildPendingTasksFromCleanText(normalized);
+      if(lastParseWarning){
+        const actionTip=pendingAddMode==='continue'&&pendingTasks.length?'\n【操作提示】已生成一条兜底日程，可点击“继续添加”手动保留。':'';
+        textarea.value=`${normalized}
+
+【解析提示】${lastParseWarning}${actionTip}`;
+      }
+    }else{
+      const normalized=normalizeOCRText(text);
+      window.lastCleanDecision={mode:'local',forced:true,likelyTable:false,likelySingleNotice:true,reason:'用户选择单日程，本地轻清洗'};
+      pendingTasks=parseSingleNoticeFallback(normalized);
+      textarea.value=`【清洗方式】本地单日程清洗
+${normalized}`;
+      if(!pendingTasks.length){
+        lastParseWarning='未拆出可用单日程，请检查标题、时间或内容是否可识别。';
+        textarea.value=`${normalized}
+
+【解析提示】${lastParseWarning}`;
+      }
+    }
+  }catch(err){
+    console.warn('Analyze flow failed, fallback to local parser:',err);
+    const normalized=normalizeOCRText(text);
+    if(mode==='multi'){
+      buildPendingTasksFromCleanText(normalized);
+    }else{
+      pendingTasks=parseSingleNoticeFallback(normalized);
+    }
+    textarea.value=normalized;
+    if(lastParseWarning){
+      const actionTip=pendingAddMode==='continue'&&pendingTasks.length?'\n【操作提示】已生成一条兜底日程，可点击“继续添加”手动保留。':'';
+      textarea.value=`${normalized}
+
+【解析提示】${lastParseWarning}${actionTip}`;
+    }
+  }finally{
+    finishAnalyze();
+  }
+}
+
+function buildPendingTasksFromCleanText(normalized){
+  pendingTasks=parseTasksFromCleanText(normalized,{allowBlockedTableFallback:true});
+}
+
+function parseTasksFromCleanText(normalized,options={}){
+  const text=sanitizeMiniMaxCleanedText(normalized).replace(/^【清洗方式】[^\n]*\n/,'');
+  lastParseWarning='';
+
+  const structuredTasks=parseStructuredScheduleRecords(text);
+  if(structuredTasks.length){
+    const structuredValidation=validateTableParse(text,structuredTasks);
+    if(!structuredValidation.ok){
+      lastParseWarning=structuredValidation.message||'结构化表格记录数量不完整，已阻止生成不完整日程。';
+      console.warn(lastParseWarning);
+      if(options.allowBlockedTableFallback){
+        pendingAddMode='continue';
+        return parseSingleNoticeFallback(text);
+      }
+      return [];
+    }
+    return finalizeParsedTasks(structuredTasks);
+  }
+
+  const tableTasks=parseTableScheduleTasks(text);
+  const validation=validateTableParse(text,tableTasks);
+  if(tableTasks.length && validation.ok){
+    return finalizeParsedTasks(tableTasks);
+  }
+
+  if(validation.isTable){
+    lastParseWarning=validation.message||'检测到表格内容，但表格拆分结果不完整，已阻止生成单个大日程。';
+    console.warn(lastParseWarning);
+    if(options.allowBlockedTableFallback){
+      pendingAddMode='continue';
+      return parseSingleNoticeFallback(text);
+    }
+    return [];
+  }
+
+  const blocks=mergeMetaBlocks(splitNoticeBlocks(text));
+  return blocks
+    .map(block=>parseNotice(block))
+    .map(task=>normalizeTaskTemporalFields(task))
+    .filter(task=>isValidParsedTask(task));
+}
+
+function parseSingleNoticeFallback(text){
+  const fallback=normalizeTaskTemporalFields(parseNotice(String(text||'').trim()));
+  return isValidParsedTask(fallback) ? [fallback] : [];
+}
+
+function finalizeParsedTasks(list){
+  return list
+    .map(task=>normalizeTaskTemporalFields(task))
+    .filter(task=>isValidParsedTask(task));
+}
+
+function parseStructuredScheduleRecords(text){
+  const jsonTasks=parseStructuredScheduleJSON(text);
+  if(jsonTasks.length) return jsonTasks;
+
+  const workTasks=parseStructuredWorkListRecords(text);
+  if(workTasks.length) return workTasks;
+
+  const timetableTasks=parseStructuredTimetableRecords(text);
+  if(timetableTasks.length) return timetableTasks;
+
+  return parseGenericScheduleRecordLines(text);
+}
+
+function parseStructuredScheduleJSON(text){
+  const payload=extractStructuredJSONPayload(text);
+  if(!payload) return [];
+
+  try{
+    const parsed=JSON.parse(payload);
+    const records=Array.isArray(parsed)
+      ?parsed
+      :(Array.isArray(parsed.records)
+        ?parsed.records
+        :(Array.isArray(parsed.tasks)
+          ?parsed.tasks
+          :(parsed&&typeof parsed==='object'?[parsed]:[])));
+    return records
+      .map(record=>makeTaskFromStructuredRecord(record))
+      .filter(Boolean);
+  }catch(err){
+    console.warn('Structured JSON parse failed:',err);
+    return [];
+  }
+}
+
+function extractStructuredJSONPayload(text){
+  const raw=String(text||'').trim();
+  const tagged=raw.match(/<schedule_records>([\s\S]*?)<\/schedule_records>/i);
+  if(tagged) return tagged[1].trim();
+
+  const fenced=raw.match(/```(?:json)?\s*([\s\S]*?)```/i);
+  if(fenced) return fenced[1].trim();
+
+  const start=raw.indexOf('[');
+  const end=raw.lastIndexOf(']');
+  if(start>=0 && end>start) return raw.slice(start,end+1).trim();
+
+  const objStart=raw.indexOf('{');
+  const objEnd=raw.lastIndexOf('}');
+  if(objStart>=0 && objEnd>objStart) return raw.slice(objStart,objEnd+1).trim();
+
+  return '';
+}
+
+function pickStructuredField(record,aliases){
+  if(!record || typeof record!=='object') return '';
+  for(const key of aliases){
+    if(record[key]!==undefined && record[key]!==null && String(record[key]).trim()!==''){
+      return String(record[key]).trim();
+    }
+  }
+  return '';
+}
+
+function makeTaskFromStructuredRecord(record){
+  if(!record || typeof record!=='object') return null;
+  const type=pickStructuredField(record,['type','类型','表格类型','recordType']);
+  const section=pickStructuredField(record,['section','分区','分类','category']);
+  const title=pickStructuredField(record,['title','标题','日程','任务','工作内容','内容','课程','课程名','name']);
+  if(!title) return null;
+
+  const start=normalizeStructuredTime(pickStructuredField(record,['start','开始','开始时间','开始日期','日期']));
+  const end=normalizeStructuredTime(pickStructuredField(record,['end','结束','结束时间']));
+  const deadline=normalizeStructuredDeadline(pickStructuredField(record,['deadline','截止','截止日期','报名日期','报名截止','提交截止']));
+  const location=pickStructuredField(record,['location','地点','教室','场地','校区']);
+  const supplementParts=[
+    section?`表格分区：${section}`:'',
+    pickStructuredField(record,['星期','weekday'])?`星期：${pickStructuredField(record,['星期','weekday'])}`:'',
+    pickStructuredField(record,['节次','sectionNo'])?`节次：${pickStructuredField(record,['节次','sectionNo'])}`:'',
+    pickStructuredField(record,['周次','weeks'])?`周次：${pickStructuredField(record,['周次','weeks'])}`:'',
+    pickStructuredField(record,['教师','teacher'])?`教师：${pickStructuredField(record,['教师','teacher'])}`:'',
+    pickStructuredField(record,['备注','note'])?`备注：${pickStructuredField(record,['备注','note'])}`:''
+  ].filter(Boolean);
+
+  const isWork=/工作|交接|进行/.test(type+section) || Boolean(pickStructuredField(record,['工作内容']));
+  const isCourse=/课程|课表/.test(type) || Boolean(pickStructuredField(record,['课程','课程名','节次','周次']));
+
+  return {
+    title,
+    start:isWork?(start||'无'):(start||'待确认'),
+    end:isWork?(end||'无'):(end||start||'待确认'),
+    deadline:deadline||'无',
+    links:normalizeLinks(pickStructuredField(record,['links','链接','url','网址'])),
+    supplement:supplementParts.join('；')||'无',
+    location:location||'待确认',
+    content:title,
+    category:section || (isCourse?'课程':detectCategory(title)),
+    importance:isWork?'high':'low',
+    urgency:deadline?'high':'low'
+  };
+}
+
+function normalizeStructuredTime(value){
+  const text=String(value||'').trim();
+  if(!text || text==='无' || text==='待确认') return text;
+  if(/^\d{1,2}[./月]\d{1,2}/.test(text)) return `${parseTableDate(text)} 00:00`;
+  return text;
+}
+
+function normalizeStructuredDeadline(value){
+  const text=String(value||'').trim();
+  if(!text || text==='无') return '';
+  const date=parseTableDate(text);
+  if(date) return `${date} 23:59`;
+  return text;
+}
+
+function parseGenericScheduleRecordLines(text){
+  return String(text||'')
+    .split(/(?=日程记录[:：])/)
+    .map(record=>record.trim())
+    .filter(record=>/^日程记录[:：]/.test(record))
+    .map(record=>{
+      const fields={};
+      const keys=['标题','内容','开始时间','结束时间','截止日期','地点','分类','补充'];
+      const keyPattern=keys.map(escapeRegExp).join('|');
+      keys.forEach(key=>{
+        const re=new RegExp(`${escapeRegExp(key)}\\s*[=：:]\\s*([\\s\\S]*?)(?=(?:[；;\\n]\\s*(?:${keyPattern})\\s*[=：:])|$)`);
+        const m=record.match(re);
+        if(m) fields[key]=m[1].trim().replace(/[；;]\s*$/,'');
+      });
+      const title=fields['标题']||fields['内容'];
+      if(!title) return null;
+      return makeTaskFromStructuredRecord({
+        title,
+        content:fields['内容']||title,
+        start:fields['开始时间'],
+        end:fields['结束时间'],
+        deadline:fields['截止日期'],
+        location:fields['地点'],
+        category:fields['分类'],
+        note:fields['补充']
+      });
+    })
+    .filter(Boolean);
+}
+
+
+/* ===== 多日程表格解析增强：课程表 / 分区工作表 ===== */
+function normalizeTableOCRSource(text){
+  return String(text || '')
+    .replace(/\r/g,'\n')
+    .replace(/[｜|]/g,' ')
+    .replace(/[—–－]/g,'-')
+    .replace(/[（]/g,'(').replace(/[）]/g,')')
+    .replace(/[：]/g,':')
+    .replace(/[／]/g,'/')
+    .replace(/[　\t]+/g,' ')
+    .replace(/^\s*[A-Z](?:\s+[A-Z]){1,8}\s*$/gm,'')
+    .replace(/^\s*\d+\s*$/gm, m => m)
+    .replace(/\n{2,}/g,'\n')
+    .trim();
+}
+
+function compactTableOCRSource(text){
+  return normalizeTableOCRSource(text)
+    .replace(/\s+/g,' ')
+    .replace(/\s*([:：])\s*/g,':')
+    .replace(/\s*([-~至到])\s*/g,'$1')
+    .trim();
+}
+
+function parseTableScheduleTasks(text){
+  const source=normalizeTableOCRSource(text);
+  if(!source) return [];
+
+  const tasks=[
+    ...parseCourseScheduleTableEnhanced(source),
+    ...parseWorkListTableEnhanced(source),
+    ...parseStudentTimetableTable(normalizeTableLines(source))
+  ];
+
+  const seen=new Set();
+  const unique=[];
+  tasks.forEach(task=>{
+    const key=[task.title,task.start,task.end,task.deadline,task.category].join('|');
+    if(seen.has(key)) return;
+    seen.add(key);
+    ensureTaskId(task);
+    unique.push(task);
+  });
+  return unique;
+}
+
+function isLikelyTableText(text){
+  const source=String(text||'');
+  const compact=compactTableOCRSource(source);
+  return /课程安排|日期\s*星期\s*时间|日期.*时间.*教室.*内容|所需书籍|需预习|需复习|工作记录|工作内容|截止日期|序号|等待交接工作|正在进行工作|其他/.test(source)
+    || /\d{1,2}\s*月\s*\d{1,2}\s*日\s*星期[一二三四五六日天]\s*(?:上午|下午|晚上|中午)?\s*\(?\s*\d{1,2}[:：]\d{2}\s*[-~至到]\s*\d{1,2}[:：]\d{2}/.test(compact)
+    || /(等待交接工作|正在进行工作|其他).{0,80}序号.{0,80}工作内容.{0,80}截止日期/.test(compact);
+}
+
+function estimateExpectedTableRows(text){
+  const source=normalizeTableOCRSource(text);
+  const compact=compactTableOCRSource(source);
+  const courseRows=(compact.match(/\d{1,2}\s*月\s*\d{1,2}\s*日\s*星期[一二三四五六日天]\s*(?:上午|下午|晚上|中午)?\s*\(?\s*\d{1,2}[:：]\d{2}\s*[-~至到]\s*\d{1,2}[:：]\d{2}/g)||[]).length;
+  const workRows=estimateEnhancedWorkRows(source);
+  const structuredRows=(source.match(/(?:工作记录|课表记录|日程记录)[:：]/g)||[]).length;
+  return Math.max(courseRows,workRows,structuredRows,0);
+}
+
+function validateTableParse(text,tasks){
+  const expected=estimateExpectedTableRows(text);
+  const isTable=isLikelyTableText(text) || expected>0;
+  if(!isTable) return {isTable:false,ok:true,expected:0};
+  if(!tasks.length){
+    return {isTable:true,ok:false,expected,message:'检测到表格内容，但没有拆出可用日程，已阻止生成单个大日程。'};
+  }
+  if(expected>=2 && tasks.length < Math.max(1,Math.ceil(expected*0.65))){
+    return {isTable:true,ok:false,expected,message:`检测到表格约 ${expected} 条记录，但只拆出 ${tasks.length} 条，已阻止生成不完整日程。`};
+  }
+  return {isTable:true,ok:true,expected};
+}
+
+function parseCourseScheduleTableEnhanced(text){
+  const source=normalizeTableOCRSource(text);
+  const compact=compactTableOCRSource(source);
+  if(!/(课程安排|所需书籍|需预习|需复习|日期.*星期.*时间.*教室.*内容)/.test(source+compact)) return [];
+
+  const titleLine=(source.match(/\d{1,2}\s*[.\-月]\s*\d{1,2}\s*[-~至到]\s*\d{1,2}\s*[.\-月]?\s*\d{1,2}\s*课程安排|课程安排/)||[])[0]||'课程安排';
+  const rowStart='\\d{1,2}\\s*月\\s*\\d{1,2}\\s*(?:日|号)?\\s*星期[一二三四五六日天]\\s*(?:上午|下午|晚上|中午)?\\s*\\(?\\s*\\d{1,2}[:：]\\d{2}\\s*[-~至到]\\s*\\d{1,2}[:：]\\d{2}';
+  const re=new RegExp(`(${rowStart}[\\s\\S]*?)(?=${rowStart}|注意事项|$)`,'g');
+  const rows=[];
+  let m;
+  while((m=re.exec(compact))){
+    const row=m[1].trim();
+    if(row) rows.push(row);
+  }
+
+  const tasks=[];
+  rows.forEach(row=>{
+    const parsed=parseCourseScheduleRowEnhanced(row,titleLine);
+    if(parsed) tasks.push(parsed);
+  });
+  return tasks;
+}
+
+function parseCourseScheduleRowEnhanced(row,titleLine){
+  const m=String(row||'').match(/(\d{1,2})\s*月\s*(\d{1,2})\s*(?:日|号)?\s*(星期[一二三四五六日天])\s*(上午|下午|晚上|中午)?\s*\(?\s*(\d{1,2}[:：]\d{2})\s*[-~至到]\s*(\d{1,2}[:：]\d{2})\s*\)?\s*([\s\S]*)$/);
+  if(!m) return null;
+
+  const [,month,day,weekday,period,startRaw,endRaw,tailRaw]=m;
+  const date=toDateString(getBaseYear(),month,day);
+  const startClock=parseClockExpression(startRaw,period);
+  const endClock=parseClockExpression(endRaw,period);
+  const tail=tailRaw
+    .replace(/^(日期|星期|时间|教室|内容|所需书籍|需预习|需复习)\s*/g,'')
+    .replace(/\s+/g,' ')
+    .trim();
+
+  const locationMatch=tail.match(/^([A-Za-z]?\s*教室|[^\s]{1,16}(?:教室|报告厅|会议室|实验室|中心|馆|楼|厅))\s*(.*)$/);
+  const location=locationMatch?locationMatch[1].replace(/\s+/g,''):'待确认';
+  let rest=locationMatch?locationMatch[2].trim():tail;
+
+  rest=rest.replace(/^内容\s*/,'').trim();
+  const title=parseCourseTitleFromTail(rest);
+  if(!title) return null;
+
+  const bookInfo=parseCourseBookInfo(rest,title);
+  const supplement=[
+    titleLine?String(titleLine).replace(/\s+/g,''):'课程安排',
+    weekday,
+    bookInfo.book?`所需书籍：${bookInfo.book}`:'',
+    bookInfo.preview?`需预习：${bookInfo.preview}`:'',
+    bookInfo.review?`需复习：${bookInfo.review}`:''
+  ].filter(Boolean).join('；');
+
+  return {
+    title,
+    start:`${date} ${startClock||'00:00'}`,
+    end:`${date} ${endClock||startClock||'23:59'}`,
+    deadline:'无',
+    links:[],
+    supplement:supplement||'无',
+    location,
+    content:[title,weekday,`${startClock||'00:00'}-${endClock||startClock||'23:59'}`].join('；'),
+    category:'课程',
+    importance:'high',
+    urgency:'low'
+  };
+}
+
+function parseCourseTitleFromTail(rest){
+  let text=String(rest||'').trim();
+  if(!text) return '';
+  text=text.replace(/\s+\/\s+\/.*$/,'').trim();
+  const bookStart=text.search(/\s(?:方法论|数学基础|概统基础|线代基础|核心词汇|核心词汇|[\u4e00-\u9fa5]{1,8}基础讲义|.*?习题册|.*?错题本)\b|\s\//);
+  if(bookStart>0) text=text.slice(0,bookStart).trim();
+  const parts=text.split(/\s{2,}|\s+(?=(?:方法论|数学基础|概统基础|线代基础|核心词汇|\/))/).map(x=>x.trim()).filter(Boolean);
+  if(parts.length) text=parts[0];
+  return text.replace(/[，,。；;]+$/,'').trim();
+}
+
+function parseCourseBookInfo(rest,title){
+  let tail=String(rest||'').replace(title,'').trim();
+  tail=tail.replace(/^[:：\-\s]+/,'').trim();
+  const parts=tail.split(/\s*\/\s*/).map(x=>x.trim()).filter(x=>x && x!=='/');
+  return {
+    book:parts[0]||tail.replace(/\s+\/.*$/,'').trim(),
+    preview:parts[1]||'',
+    review:parts[2]||''
+  };
+}
+
+function parseWorkListTableEnhanced(text){
+  const source=normalizeTableOCRSource(text);
+  const compact=compactTableOCRSource(source);
+  if(!/(等待交接工作|正在进行工作|其他|工作内容|截止日期|序号)/.test(source+compact)) return [];
+
+  const sectionNames=['等待交接工作','正在进行工作','其他'];
+  const tasks=[];
+  const ranges=sectionNames
+    .map(name=>({name,index:compact.indexOf(name)}))
+    .filter(x=>x.index>=0)
+    .sort((a,b)=>a.index-b.index);
+
+  if(ranges.length){
+    ranges.forEach((range,i)=>{
+      const next=ranges[i+1];
+      const block=compact.slice(range.index+range.name.length,next?next.index:compact.length);
+      extractEnhancedWorkRows(block,range.name).forEach(task=>tasks.push(task));
+    });
+  }else{
+    extractEnhancedWorkRows(compact,'表格任务').forEach(task=>tasks.push(task));
+  }
+
+  return tasks;
+}
+
+function estimateEnhancedWorkRows(text){
+  return parseWorkListTableEnhanced(text).length;
+}
+
+function extractEnhancedWorkRows(sectionText,section){
+  let text=String(sectionText||'')
+    .replace(/序号\s*工作内容\s*截止日期\s*备注?/g,' ')
+    .replace(/工作内容\s*截止日期\s*备注?/g,' ')
+    .replace(/截止日期\s*备注?/g,' ')
+    .replace(/截止日期备注/g,' ')
+    .replace(/备注/g,' ')
+    .replace(/[，,；;]+\s*$/,'')
+    .replace(/\s+/g,' ')
+    .trim();
+
+  const datePattern='(?:20\\d{2}[-/.年]\\s*)?\\d{1,2}[.月/]\\d{1,2}\\s*(?:日|号)?';
+
+  // OCR 常把“1 工作内容 5.25 2 下一条”压成“1工作内容5.252下一条”。
+  // 先在“日期 + 下一条序号”之间强制断行，再在“序号 + 中文/英文内容”前断行。
+  text=text
+    .replace(new RegExp(`(${datePattern})(?=\\s*\\d+\\s*[\\u4e00-\\u9fa5A-Za-z（(])`,'g'),'$1\n')
+    .replace(/\s+(?=\d+\s*[\u4e00-\u9fa5A-Za-z（(])/g,'\n')
+    .replace(/(^|\n)\s*(\d+)\s+(?=[\u4e00-\u9fa5A-Za-z（(])/g,'$1$2');
+
+  const rows=[];
+  const re=new RegExp(`(?:^|\\n)\\s*(\\d+)\\s*([\\s\\S]*?)\\s*(${datePattern})(?=\\s*(?:\\n\\s*\\d+\\s*[\\u4e00-\\u9fa5A-Za-z（(]|$))`,'g');
+  let m;
+  while((m=re.exec(text))){
+    const content=m[2].replace(/\s+/g,' ').replace(/[，,；;：:]+$/,'').trim();
+    const deadline=m[3].trim();
+    if(content && !/^(序号|工作内容|截止日期|备注)$/.test(content)){
+      rows.push(makeWorkListTask(content,deadline,section,''));
+    }
+  }
+
+  if(rows.length) return rows;
+
+  // 最后兜底：不依赖换行，直接扫描“序号 + 内容 + 日期”片段。
+  const compact=text.replace(/\n+/g,' ').replace(/\s+/g,' ').trim();
+  const looseRe=new RegExp(`(?:^|\\s)(\\d+)\\s*([\\u4e00-\\u9fa5A-Za-z（(][\\s\\S]*?)\\s*(${datePattern})(?=\\s*\\d+\\s*[\\u4e00-\\u9fa5A-Za-z（(]|$)`,'g');
+  while((m=looseRe.exec(compact))){
+    const content=m[2].replace(/\s+/g,' ').replace(/[，,；;：:]+$/,'').trim();
+    const deadline=m[3].trim();
+    if(content) rows.push(makeWorkListTask(content,deadline,section,''));
+  }
+  if(rows.length) return rows;
+
+  return text.split('\n')
+    .map(line=>parseWorkListRow(line,section))
+    .filter(Boolean);
+}
+
+function parseTableDate(value){
+  const raw=String(value||'').replace(/\s+/g,'').replace(/号/g,'日');
+  let m=raw.match(/(20\d{2})[-/.年](\d{1,2})[-/.月](\d{1,2})/);
+  if(m) return toDateString(m[1],m[2],m[3]);
+  m=raw.match(/(\d{1,2})[./月](\d{1,2})/);
+  if(m) return toDateString(getBaseYear(),m[1],m[2]);
+  return '';
+}
+
+
+
+function normalizeTableLines(text){
+  return String(text||'')
+    .replace(/[|｜]/g,' ')
+    .replace(/[　\t]+/g,' ')
+    .split('\n')
+    .map(line=>line.replace(/\s{2,}/g,' ').trim())
+    .filter(Boolean)
+    .filter(line=>!/^[A-Z](?:\s+[A-Z])+$/.test(line))
+    .filter(line=>!/^[A-Z]$/.test(line));
+}
+
+function parseStudentTimetableTable(lines){
+  const joined=lines.join('\n');
+  if(!/(课表|时间段|节次|星期一|星期二|星期三|星期四|星期五|星期六|星期日|课程性质简称|教学班组成|课表记录|第一行课程|第二行课程|第三行课程|第四行课程)/.test(joined)) return [];
+
+  const tasks=[];
+  parseStructuredTimetableRecords(joined).forEach(item=>tasks.push(item));
+
+  if(!tasks.length){
+    parseCompactTimetableCourses(joined).forEach(item=>tasks.push(item));
+  }
+
+  return tasks;
+}
+
+function parseStructuredTimetableRecords(text){
+  return String(text||'')
+    .replace(/\r/g,'')
+    .split(/(?=课表记录[:：])/)
+    .map(record=>record.trim())
+    .filter(record=>/^课表记录[:：]/.test(record))
+    .map(record=>record.replace(/^课表记录[:：]/,'').replace(/\n+/g,'；'))
+    .map(parseTimetableKeyValueRecord)
+    .filter(Boolean);
+}
+
+function parseTimetableKeyValueRecord(line){
+  const fields={};
+  const keys=['课程性质简称','教学班组成','考核方式','课程名','时间段','星期','日期','节次','课程','名称','周次','周','校区','地点','场地','教室','教师','班级','性质','考核','学分'];
+  const keyPattern=keys.map(escapeRegExp).join('|');
+  keys.forEach(key=>{
+    const re=new RegExp(`${escapeRegExp(key)}\\s*[=：:]\\s*([\\s\\S]*?)(?=(?:[；;]\\s*(?:${keyPattern})\\s*[=：:])|$)`);
+    const m=String(line||'').match(re);
+    if(m) fields[key]=m[1].trim().replace(/[；;]\s*$/,'');
+  });
+
+  const course=fields['课程']||fields['课程名']||fields['名称'];
+  if(!course) return null;
+
+  return makeTimetableTask({
+    course,
+    weekday:fields['星期']||fields['日期']||'',
+    section:fields['节次']||fields['时间段']||'',
+    weeks:fields['周次']||fields['周']||'',
+    campus:fields['校区']||'',
+    location:fields['地点']||fields['场地']||fields['教室']||'',
+    teacher:fields['教师']||'',
+    classGroup:fields['教学班组成']||fields['班级']||'',
+    nature:fields['课程性质简称']||fields['性质']||'',
+    exam:fields['考核方式']||fields['考核']||'',
+    credit:fields['学分']||''
+  });
+}
+
+function parseCompactTimetableCourses(text){
+  const source=String(text||'')
+    .replace(/<[^>]+>/g,' ')
+    .replace(/\s+/g,' ')
+    .replace(/(学分[:：]\s*\d+(?:\.\d+)?)(?=-)/g,'$1；')
+    .replace(/(第[一二三四五六七八九十\d]+[行节]课程)[:：-]/g,'；$1：')
+    .replace(/(星期[一二三四五六日天])[:：]/g,'；$1：');
+
+  const tasks=[];
+  const re=/([^:：；。\n-][^:：；。\n]{1,36})[:：]\s*((?:[（(]?\d{1,2}\s*[-—至到]\s*\d{1,2}\s*节[）)]?)?\s*(?:\d{1,2}\s*[-—至到]\s*\d{1,2}\s*周|\d{1,2}\s*周|待补充)[\s\S]*?)(?=(?:[-；。\n]\s*)?[^:：；。\n-][^:：；。\n]{1,36}[:：]\s*(?:[（(]?\d{1,2}\s*[-—至到]\s*\d{1,2}\s*节[）)]?)?\s*(?:\d{1,2}\s*[-—至到]\s*\d{1,2}\s*周|\d{1,2}\s*周|待补充)|$)/g;
+  let m;
+
+  while((m=re.exec(source))){
+    const course=cleanTimetableCourseName(m[1]);
+    const detail=m[2].trim();
+    if(!course || isTimetableMetaName(course)) continue;
+    const parsed=parseTimetableCourseDetail(detail);
+    tasks.push(makeTimetableTask({course,...parsed}));
+  }
+
+  return tasks;
+}
+
+function cleanTimetableCourseName(value){
+  return String(value||'')
+    .replace(/^(?:第一|第二|第三|第四|第五|第六|第七|第八|第九|第十|第\d+)[行节]课程[-：:\s]*/,'')
+    .replace(/^(星期[一二三四五六日天])[-：:\s]*/,'')
+    .replace(/^\d+(?:\.\d+)?[-—]/,'')
+    .replace(/^[\s\-—；。]+/,'')
+    .replace(/[，,。；;]+$/,'')
+    .trim();
+}
+
+function isTimetableMetaName(name){
+  return /^(时间段|节次|星期|星期一|星期二|星期三|星期四|星期五|星期六|星期日|校区|场地|教师|教学班组成|课程性质简称|考核方式|学分|学号|课表|课程表)$/.test(name);
+}
+
+function parseTimetableCourseDetail(detail){
+  const text=String(detail||'').trim();
+  const section=(text.match(/[（(]\s*(\d{1,2}\s*[-—至到]\s*\d{1,2}\s*节)\s*[）)]/)||[])[1]||'';
+  const weeks=(text.match(/(\d{1,2}\s*[-—至到]\s*\d{1,2}\s*周(?:\s*[（(]单[）)])?(?:\s*[,，]\s*\d{1,2}\s*周?)*|\d{1,2}\s*周|待补充)/)||[])[1]||'';
+  return {
+    section:section.replace(/\s+/g,''),
+    weeks:weeks.replace(/\s+/g,''),
+    campus:pickTimetableField(text,'校区'),
+    location:pickTimetableField(text,'场地')||pickTimetableField(text,'地点')||pickTimetableField(text,'教室'),
+    teacher:pickTimetableField(text,'教师'),
+    classGroup:pickTimetableField(text,'教学班组成')||pickTimetableField(text,'班级'),
+    nature:pickTimetableField(text,'课程性质简称')||pickTimetableField(text,'性质'),
+    exam:pickTimetableField(text,'考核方式')||pickTimetableField(text,'考核'),
+    credit:pickTimetableField(text,'学分'),
+    weekday:(text.match(/星期[一二三四五六日天]/)||[])[0]||''
+  };
+}
+
+function pickTimetableField(text,label){
+  const re=new RegExp(`${label}[:：]([^/。\\n]+)`);
+  const m=String(text||'').match(re);
+  return m?m[1].replace(/[；;]\s*$/,'').trim():'';
+}
+
+function makeTimetableTask(info){
+  const location=[info.campus,info.location].filter(Boolean).join(' ');
+  const supplement=[
+    info.weekday?`星期：${info.weekday}`:'',
+    info.section?`节次：${info.section}`:'',
+    info.weeks?`周次：${info.weeks}`:'',
+    info.teacher?`教师：${info.teacher}`:'',
+    info.classGroup?`班级：${info.classGroup}`:'',
+    info.nature?`性质：${info.nature}`:'',
+    info.exam?`考核：${info.exam}`:'',
+    info.credit?`学分：${info.credit}`:''
+  ].filter(Boolean).join('；');
+
+  const content=[
+    `课程：${info.course}`,
+    info.weekday||'',
+    info.section||'',
+    info.weeks||''
+  ].filter(Boolean).join('；');
+
+  return {
+    title:info.course,
+    start:'待确认',
+    end:'待确认',
+    deadline:'无',
+    links:[],
+    supplement:supplement||'课表课程',
+    location:location||'待确认',
+    content,
+    category:'课程',
+    importance:'low',
+    urgency:'low'
+  };
+}
+
+function parseCourseScheduleTable(lines){
+  const joined=lines.join('\n');
+  if(!/(课程安排|日期\s*星期\s*时间|日期.*时间.*教室.*内容)/.test(joined)) return [];
+
+  const titleLine=extractCourseScheduleTitle(lines);
+  const tasks=[];
+  const courseRows=extractCourseScheduleRows(lines);
+
+  courseRows.forEach(line=>{
+    if(/^(日期|星期|时间|教室|内容|所需书籍|需预习|需复习|注意事项)/.test(line)) return;
+
+    const row=line.match(/(\d{1,2})\s*月\s*(\d{1,2})\s*日\s*(星期[一二三四五六日天])?\s*(上午|下午|晚上|中午)?\s*[（(]?\s*(\d{1,2}[:：]\d{2})\s*[-~—至到]\s*(\d{1,2}[:：]\d{2})\s*[）)]?\s*(.+)$/);
+    if(!row) return;
+
+    const month=row[1];
+    const day=row[2];
+    const weekday=row[3]||'';
+    const period=row[4]||'';
+    const startClock=parseClockExpression(row[5],period);
+    const endClock=parseClockExpression(row[6],period);
+    const date=toDateString(getBaseYear(),month,day);
+    const parsed=parseCourseRowTail(row[7]);
+    if(!parsed.title) return;
+
+    const supplement=[
+      titleLine,
+      weekday,
+      parsed.book?`所需书籍：${parsed.book}`:'',
+      parsed.preview?`需预习：${parsed.preview}`:'',
+      parsed.review?`需复习：${parsed.review}`:''
+    ].filter(Boolean).join('；');
+
+    tasks.push({
+      title:parsed.title,
+      start:`${date} ${startClock||'00:00'}`,
+      end:`${date} ${endClock||startClock||'23:59'}`,
+      deadline:'无',
+      links:[],
+      supplement:supplement||'无',
+      location:parsed.location||'待确认',
+      content:[parsed.title,weekday,`${startClock||'00:00'}-${endClock||startClock||'23:59'}`].filter(Boolean).join('；'),
+      category:detectCategory(parsed.title+' 课程 作业'),
+      importance:'high',
+      urgency:'low'
+    });
+  });
+
+  return tasks;
+}
+
+function extractCourseScheduleRows(lines){
+  const rowRe=/\d{1,2}\s*月\s*\d{1,2}\s*日\s*星期[一二三四五六日天]\s*(?:上午|下午|晚上|中午)?\s*[（(]?\s*\d{1,2}[:：]\d{2}\s*[-~—至到]\s*\d{1,2}[:：]\d{2}/;
+  const directRows=lines.filter(line=>rowRe.test(line));
+  if(directRows.length>1) return directRows;
+
+  const dateStart='\\d{1,2}\\s*月\\s*\\d{1,2}\\s*日\\s*星期[一二三四五六日天]\\s*(?:上午|下午|晚上|中午)?\\s*[（(]?\\s*\\d{1,2}[:：]\\d{2}\\s*[-~—至到]\\s*\\d{1,2}[:：]\\d{2}';
+  const compact=lines.join(' ')
+    .replace(/\s+/g,' ')
+    .replace(/注意事项[:：]?.*$/,'')
+    .replace(/(日期\s*星期\s*时间\s*教室\s*内容\s*所需书籍\s*需预习\s*需复习)/,'$1 ')
+    .replace(new RegExp(`\\s+(?=${dateStart})`,'g'),'\n')
+    .replace(new RegExp(`(\\S)(?=${dateStart})`,'g'),'$1\n');
+
+  return compact
+    .split('\n')
+    .map(line=>line.trim())
+    .filter(line=>rowRe.test(line))
+    .map(line=>line.replace(/^.*?(?=\d{1,2}\s*月\s*\d{1,2}\s*日)/,'').trim());
+}
+
+function extractCourseScheduleTitle(lines){
+  const source=lines.find(line=>/课程安排/.test(line))||'课程安排';
+  const m=source.match(/(?:\d{1,2}\s*[.\-月]\s*\d{1,2}\s*[-~—至到]\s*\d{1,2}\s*[.\-月]?\s*\d{1,2}\s*)?课程安排/);
+  return m?m[0].replace(/\s+/g,''):'课程安排';
+}
+
+function parseCourseRowTail(tail){
+  let rest=String(tail||'').trim();
+  let location='';
+  const locationMatch=rest.match(/^([A-Za-z]?\s*教室|[^ ]{1,16}(?:教室|报告厅|会议室|实验室|中心|馆|楼|厅))\s+(.+)$/);
+  if(locationMatch){
+    location=locationMatch[1].replace(/\s+/g,'');
+    rest=locationMatch[2].trim();
+  }
+
+  let parts=rest.split(/\s{2,}| {1,}(?=(?:方法论|数学基础|概统基础|线代基础|核心词汇|\/))/).map(x=>x.trim()).filter(Boolean);
+  if(parts.length<2) parts=rest.split(/\s+/).map(x=>x.trim()).filter(Boolean);
+
+  const title=parts.shift()||rest.split(/\s+/)[0]||'课程安排';
+  let book='';
+  let preview='';
+  let review='';
+  const remainder=parts.join(' ').trim();
+  if(/\s\/\s?/.test(remainder)){
+    const slashParts=remainder.split(/\s*\/\s*/);
+    book=(slashParts[0]||'').trim();
+    if(slashParts.length===2){
+      preview='';
+      review=(slashParts[1]||'').trim();
+    }else{
+      preview=(slashParts[1]||'').trim();
+      review=(slashParts[2]||'').trim();
+    }
+  }else{
+    book=parts.shift()||'';
+    preview=parts.shift()||'';
+    review=parts.shift()||'';
+  }
+  return {location,title,book,preview,review};
+}
+
+function parseWorkListTable(lines){
+  const joined=lines.join('\n');
+  if(!/(工作记录|工作内容|截止日期|等待交接工作|正在进行工作|其他)/.test(joined)) return [];
+
+  const sectionNames=['等待交接工作','正在进行工作','其他'];
+  const tasks=[];
+  const structured=parseStructuredWorkListRecords(joined);
+  if(structured.length) return structured;
+
+  const compact=joined
+    .replace(/\s+/g,' ')
+    .replace(/([：:])\s+/g,'$1')
+    .trim();
+
+  const sectionRanges=sectionNames
+    .map(section=>({section,index:compact.indexOf(section)}))
+    .filter(item=>item.index>=0)
+    .sort((a,b)=>a.index-b.index);
+
+  if(sectionRanges.length){
+    sectionRanges.forEach((item,index)=>{
+      const next=sectionRanges[index+1];
+      const sectionText=compact
+        .slice(item.index+item.section.length,next?next.index:compact.length)
+        .trim();
+      extractWorkListRows(sectionText,item.section).forEach(row=>tasks.push(row));
+    });
+    return tasks;
+  }
+
+  let currentSection='';
+  lines.forEach(line=>{
+    const directSection=sectionNames.find(name=>line.includes(name));
+    if(directSection){
+      currentSection=directSection;
+      return;
+    }
+
+    if(/^(序号|工作内容|截止日期|备注)\b/.test(line) || /序号.*工作内容.*截止日期/.test(line)) return;
+
+    const row=parseWorkListRow(line,currentSection);
+    if(row) tasks.push(row);
+  });
+
+  return tasks;
+}
+
+function parseStructuredWorkListRecords(text){
+  return String(text||'')
+    .replace(/\r/g,'')
+    .split(/(?=工作记录[:：])/)
+    .map(record=>record.trim())
+    .filter(record=>/^工作记录[:：]/.test(record))
+    .map(record=>record.replace(/^工作记录[:：]/,'').replace(/\n+/g,'；'))
+    .map(record=>{
+      const fields={};
+      const keys=['工作内容','截止日期','分区','序号','内容','截止','备注'];
+      const keyPattern=keys.map(escapeRegExp).join('|');
+      keys.forEach(key=>{
+        const re=new RegExp(`${escapeRegExp(key)}\\s*[=：:]\\s*([\\s\\S]*?)(?=(?:[；;]\\s*(?:${keyPattern})\\s*[=：:])|$)`);
+        const m=record.match(re);
+        if(m) fields[key]=m[1].trim().replace(/[；;]\s*$/,'');
+      });
+      const work=fields['工作内容']||fields['内容'];
+      const date=fields['截止日期']||fields['截止'];
+      if(!work||!date) return null;
+      return makeWorkListTask(work,date,fields['分区']||'表格任务',fields['备注']||'');
+    })
+    .filter(Boolean);
+}
+
+function extractWorkListRows(sectionText,section){
+  const text=String(sectionText||'')
+    .replace(/^(序号\s*)?工作内容\s*截止日期\s*备注?/,' ')
+    .replace(/序号\s*工作内容\s*截止日期\s*备注?/g,' ')
+    .replace(/(\d{1,2}[.月]\d{1,2})(?=\d+\s+[\u4e00-\u9fa5A-Za-z])/g,'$1\n')
+    .replace(/(\d{1,2}[.月]\d{1,2}[日号]?)(?=\d+\s+[\u4e00-\u9fa5A-Za-z])/g,'$1\n')
+    .replace(/\s+(?=\d+\s+[\u4e00-\u9fa5A-Za-z])/g,'\n')
+    .replace(/\n+/g,'\n')
+    .trim();
+
+  const rows=[];
+  const rowRe=/(?:^|\n)\s*(\d+)\s+([\s\S]*?)\s*((?:20\d{2}[-/.年]\s*\d{1,2}[-/.月]\s*\d{1,2}\s*[日号]?|\d{1,2}\s*[./月]\s*\d{1,2}\s*[日号]?))(?=\s*(?:\n\s*\d+\s+|$))/g;
+  let m;
+
+  while((m=rowRe.exec(text))){
+    const work=m[2].trim().replace(/[，,；;：:]+$/,'');
+    if(!work) continue;
+    rows.push(makeWorkListTask(work,m[3],section,''));
+  }
+
+  if(rows.length) return rows;
+
+  return text
+    .split('\n')
+    .map(line=>parseWorkListRow(line,section))
+    .filter(Boolean);
+}
+
+function parseWorkListRow(line,currentSection){
+  const value=String(line||'').trim();
+  const m=value.match(/^(\d+)\s+(.+)$/);
+  if(!m) return null;
+
+  const body=m[2].trim();
+  const dateMatch=[...body.matchAll(/(20\d{2}[-/.年]\s*\d{1,2}[-/.月]\s*\d{1,2}\s*[日号]?|\d{1,2}\s*[./月]\s*\d{1,2}\s*[日号]?)/g)].pop();
+  if(!dateMatch) return null;
+
+  const work=body.slice(0,dateMatch.index).trim().replace(/[，,；;：:]+$/,'');
+  const note=body.slice(dateMatch.index+dateMatch[0].length).trim();
+  if(!work) return null;
+
+  return makeWorkListTask(work,dateMatch[0],currentSection,note,value);
+}
+
+function makeWorkListTask(work,dateValue,currentSection,note='',rawValue=''){
+  const deadline=parseTableDate(dateValue);
+  const section=currentSection||'表格任务';
+  const supplement=[
+    `表格分区：${section}`,
+    note?`备注：${note}`:''
+  ].filter(Boolean).join('；');
+
+  return {
+    title:work,
+    start:'无',
+    end:'无',
+    deadline:deadline?`${deadline} 23:59`:'无',
+    links:[],
+    supplement:supplement||'无',
+    location:'待确认',
+    content:work,
+    category:section,
+    importance:/等待|正在|截止|交接|工作/.test(section+work)?'high':'low',
+    urgency:'high'
+  };
+}
+
+function parseTableDate(value){
+  const raw=String(value||'').replace(/\s+/g,'');
+  let m=raw.match(/(20\d{2})[-/.年](\d{1,2})[-/.月](\d{1,2})/);
+  if(m) return toDateString(m[1],m[2],m[3]);
+
+  m=raw.match(/(\d{1,2})[./月](\d{1,2})/);
+  if(m) return toDateString(getBaseYear(),m[1],m[2]);
+
+  return '';
+}
+
+function finishAnalyze(){
+  const confirmBtn=document.getElementById('confirmBtn');
+  confirmBtn.innerText=pendingAddMode==='continue'?'继续添加':'确认添加';
+  if(pendingTasks.length){
+    confirmBtn.classList.remove('opacity-40','pointer-events-none');
+  }else{
+    confirmBtn.classList.add('opacity-40','pointer-events-none');
+  }
+  const singleBtn=document.getElementById('singleScheduleBtn');
+  const multiBtn=document.getElementById('multiScheduleBtn');
+  if(singleBtn){
+    singleBtn.innerText='单日程';
+    singleBtn.disabled=false;
+  }
+  if(multiBtn){
+    multiBtn.innerText='多日程';
+    multiBtn.disabled=false;
+  }
+}
+
+function normalizeOCRText(text){
+  return formatOCRText(text)
+    .replace(/[：]/g,':')
+    .replace(/[－—–]/g,'-')
+    .replace(/[ \t]+/g,' ')
+    .trim();
+}
+
+function initMiniMaxConfig(){
+  const baseUrlInput=document.getElementById('minimaxBaseUrl');
+  const modelInput=document.getElementById('minimaxModel');
+  const keyInput=document.getElementById('minimaxApiKey');
+  const enabledInput=document.getElementById('minimaxCleanEnabled');
+  if(!baseUrlInput||!modelInput||!keyInput||!enabledInput) return;
+
+  const saved=JSON.parse(localStorage.getItem('minimaxCleanConfig')||'{}');
+  baseUrlInput.value=saved.apiUrl||MINIMAX_CONFIG.apiUrl;
+  modelInput.value=saved.model||MINIMAX_CONFIG.model;
+  keyInput.value=saved.apiKey||MINIMAX_CONFIG.apiKey;
+  enabledInput.checked=saved.enabled!==false;
+
+  const persist=()=>{
+    localStorage.setItem('minimaxCleanConfig',JSON.stringify({
+      apiUrl:baseUrlInput.value.trim()||MINIMAX_CONFIG.apiUrl,
+      model:modelInput.value.trim()||MINIMAX_CONFIG.model,
+      apiKey:keyInput.value.trim(),
+      enabled:enabledInput.checked
+    }));
+  };
+  [baseUrlInput,modelInput,keyInput,enabledInput].forEach(input=>{
+    input.addEventListener('change',persist);
+    input.addEventListener('input',persist);
+  });
+}
+
+function getMiniMaxCleanConfig(){
+  const baseUrlInput=document.getElementById('minimaxBaseUrl');
+  const modelInput=document.getElementById('minimaxModel');
+  const keyInput=document.getElementById('minimaxApiKey');
+  const enabledInput=document.getElementById('minimaxCleanEnabled');
+  return {
+    enabled:!enabledInput||enabledInput.checked,
+    apiUrl:(baseUrlInput&&baseUrlInput.value.trim())||MINIMAX_CONFIG.apiUrl,
+    model:(modelInput&&modelInput.value.trim())||MINIMAX_CONFIG.model,
+    apiKey:(keyInput&&keyInput.value.trim())||MINIMAX_CONFIG.apiKey
+  };
+}
+
+function extractMiniMaxContent(data){
+  if(!data) return '';
+  const choice=Array.isArray(data.choices)?data.choices[0]:null;
+  return (choice&&choice.message&&choice.message.content)
+    ||(choice&&choice.delta&&choice.delta.content)
+    ||data.output_text
+    ||data.reply
+    ||(data.data&&data.data.output)
+    ||'';
+}
+
+function sanitizeMiniMaxCleanedText(content){
+  let text=String(content||'').trim();
+  const tagged=text.match(/<cleaned_text>([\s\S]*?)<\/cleaned_text>/i);
+  if(tagged) text=tagged[1].trim();
+
+  text=text.replace(/<think>[\s\S]*?<\/think>/gi,'').trim();
+
+  if(/^<think>/i.test(text)){
+    const markers=['<schedule_records>','工作记录','课表记录','日程记录','第一行课程','第二行课程','第三行课程','第四行课程','时间段','星期一','202','@全体成员'];
+    const indexes=markers
+      .map(marker=>text.indexOf(marker))
+      .filter(index=>index>0);
+    if(indexes.length){
+      text=text.slice(Math.min(...indexes));
+    }
+  }
+
+  return text
+    .replace(/<\/?think>/gi,'')
+    .replace(/^清洗后的(?:通知)?正文[:：]\s*/,'')
+    .replace(/^整理后的(?:课表|文本)[:：]\s*/,'')
+    .replace(/^以下是[^：:]{0,30}[:：]\s*/,'')
+    .trim();
+}
+
+function countMatches(text,regex){
+  return (String(text||'').match(regex)||[]).length;
+}
+
+function getOCRTableDecision(rawText,cleanedText=''){
+  const raw=String(rawText||'');
+  const local=String(cleanedText||rawText||'');
+  const compact=local.replace(/\s+/g,'');
+  const lines=local.split('\n').map(line=>line.trim()).filter(Boolean);
+
+  const tableHeaderScore=[
+    /日期/.test(local)&&/星期/.test(local)&&/时间/.test(local),
+    /教室/.test(local)&&/(内容|课程|课程安排)/.test(local),
+    /所需书籍/.test(local)||/需预习/.test(local)||/需复习/.test(local),
+    /序号/.test(local)&&/(工作内容|截止日期)/.test(local),
+    /时间段/.test(local)&&/节次/.test(local),
+    /星期一/.test(local)&&/星期二/.test(local)&&/星期三/.test(local)
+  ].filter(Boolean).length;
+
+  const repeatedDateRows=countMatches(local,/\d{1,2}\s*月\s*\d{1,2}\s*[日号]?\s*星期[一二三四五六日天]/g);
+  const repeatedTimeRanges=countMatches(local,/(?:上午|下午|晚上|中午)?\s*[（(]?\s*\d{1,2}[:：]\d{2}\s*[-~—至到]\s*\d{1,2}[:：]\d{2}/g);
+  const repeatedDeadlines=countMatches(local,/(?:20\d{2}[-/.年]\s*)?\d{1,2}[.月]\s*\d{1,2}\s*[日号]?/g);
+  const serialRows=countMatches(local,/(?:^|\n|\s)\d{1,2}\s+[一-龥A-Za-z（(][^\n]{2,80}?(?:20\d{2}[-/.年]\s*)?\d{1,2}[.月]\s*\d{1,2}/g);
+  const structuredRows=countMatches(local,/(?:工作记录|课表记录|日程记录)[:：]/g);
+  const pipeOrCellSeparators=countMatches(raw,/[|｜┌┬┐├┼┤└┴┘]/g)+countMatches(raw,/\t/g);
+  const manyShortAlignedLines=lines.filter(line=>{
+    const cellLike=countMatches(line,/\s{2,}|[|｜]/g);
+    return cellLike>=2 || /\d{1,2}\s*月\s*\d{1,2}\s*日.*(?:C教室|教室|报告厅|会议室)/.test(line);
+  }).length;
+
+  const tableScore =
+    tableHeaderScore*3 +
+    Math.min(repeatedDateRows,6)*2 +
+    Math.min(repeatedTimeRanges,6) +
+    Math.min(serialRows,6)*2 +
+    Math.min(structuredRows,6)*3 +
+    Math.min(pipeOrCellSeparators,8) +
+    Math.min(manyShortAlignedLines,5)*2;
+
+  const simpleNoticeSignals=[
+    /^@?全体成员/.test(compact),
+    /报名截止时间|报名截止|截止时间/.test(compact),
+    /腾讯文档|docs\.qq\.com|链接/.test(compact),
+    /(今天|明天|后天|本周|下周)/.test(compact),
+    /时间[:：]|地点[:：]/.test(local)
+  ].filter(Boolean).length;
+
+  const noticeStartCount=countMatches(local,/(?:^|\n)\s*(?:@?全体成员|今天|今日|明天|后天|\d{1,2}\s*月\s*\d{1,2}\s*[日号]?|【[^】]+】)/g);
+  const explicitScheduleRecords=structuredRows || repeatedDateRows || serialRows;
+  const likelySingleNotice = explicitScheduleRecords<=1 && noticeStartCount<=1 && simpleNoticeSignals>=2 && tableHeaderScore===0;
+  const likelyTable = tableScore>=7 || tableHeaderScore>=2 || repeatedDateRows>=3 || serialRows>=2 || structuredRows>=2;
+
+  return {
+    mode: likelyTable && !likelySingleNotice ? 'minimax' : 'local',
+    likelyTable,
+    likelySingleNotice,
+    score:tableScore,
+    repeatedDateRows,
+    repeatedTimeRanges,
+    serialRows,
+    structuredRows,
+    tableHeaderScore,
+    reason: likelyTable && !likelySingleNotice
+      ? `表格式/多日程特征：score=${tableScore}, 日期行=${repeatedDateRows}, 时间段=${repeatedTimeRanges}, 序号行=${serialRows}, 表头=${tableHeaderScore}`
+      : `简单通知/单日程：score=${tableScore}, 通知信号=${simpleNoticeSignals}, 起始块=${noticeStartCount}`
+  };
+}
+
+async function cleanOCRTextAsMultiSchedule(text){
+  const localCleaned=normalizeOCRText(text);
+  const config=getMiniMaxCleanConfig();
+  if(!config.enabled||!config.apiKey){
+    window.lastCleanDecision={mode:'local',forced:true,likelyTable:true,reason:'用户选择多日程，但 MiniMax 未启用或缺少 API Key，使用本地表格解析'};
+    return localCleaned;
+  }
+
+  try{
+    window.lastCleanDecision={mode:'minimax',forced:true,likelyTable:true,reason:'用户选择多日程，强制使用 MiniMax 表格清洗'};
+    const aiCleaned=await cleanOCRTextWithMiniMax(text,config);
+    const cleaned=sanitizeMiniMaxCleanedText(aiCleaned||localCleaned);
+    return isStructuredScheduleText(cleaned)?cleaned:normalizeOCRText(cleaned);
+  }catch(err){
+    console.warn('Forced MiniMax multi-schedule clean failed, using local table parse:',err);
+    window.lastCleanDecision={mode:'local',forced:true,likelyTable:true,reason:'用户选择多日程，但 MiniMax 清洗失败，回退本地表格解析'};
+    return localCleaned;
+  }
+}
+
+async function cleanOCRText(text){
+  const localCleaned=normalizeOCRText(text);
+  const decision=getOCRTableDecision(text,localCleaned);
+  window.lastCleanDecision=decision;
+
+  if(decision.mode==='local'){
+    console.info('OCR clean mode: local',decision.reason);
+    return localCleaned;
+  }
+
+  const config=getMiniMaxCleanConfig();
+  if(!config.enabled||!config.apiKey){
+    console.info('OCR clean mode: table detected but MiniMax disabled, fallback local',decision.reason);
+    return localCleaned;
+  }
+
+  try{
+    console.info('OCR clean mode: minimax',decision.reason);
+    const aiCleaned=await cleanOCRTextWithMiniMax(text,config);
+    const cleaned=sanitizeMiniMaxCleanedText(aiCleaned||localCleaned);
+    return isStructuredScheduleText(cleaned)?cleaned:normalizeOCRText(cleaned);
+  }catch(err){
+    console.warn('MiniMax clean failed for table-like OCR, using local clean result:',err);
+    return localCleaned;
+  }
+}
+
+function isStructuredScheduleText(text){
+  return /<schedule_records>|工作记录[:：]|课表记录[:：]|日程记录[:：]|^\s*[\[{]/.test(String(text||'').trim());
+}
+
+async function cleanOCRTextWithMiniMax(text,config){
+  const systemPrompt=[
+    '你是一个日程通知 OCR 文本清洗器，只负责清洗文本，不负责生成日程 JSON。',
+    '目标：修复 OCR 误换行、断词、错乱空格和多余空行，让后续程序能稳定提取时间、地点、链接和补充信息。',
+    '规则：保留原始事实、日期、时间、地点、链接、括号内容、【】内容、@信息；不要总结、不要改写含义、不要新增信息。',
+    '如果文本来自表格，优先输出 <schedule_records>JSON数组</schedule_records>，每个对象是一条日程记录。',
+    '必须特别处理两类多日程表：1）无分区标题课程安排表，列通常为日期、星期、时间、教室、内容、所需书籍、需预习、需复习，每一行都必须输出为独立日程；2）有分区标题工作表，分区通常为等待交接工作、正在进行工作、其他，每个分区下每一行都必须输出为独立日程，并把分区写入 section 字段。',
+    '课程安排表字段映射：title=内容列；start/end=日期+时间列；location=教室列；note 中保留所需书籍、需预习、需复习；category=课程。',
+    '工作清单表字段映射：title/content=工作内容列；deadline=截止日期列；section=当前分区标题；note=备注列。',
+    'JSON字段统一使用：type、section、title、content、start、end、deadline、location、note、weekday、sectionNo、weeks、teacher。',
+    '普通表格必须保留表格标题、分区标题、列标题和每一行的对应关系；例如“等待交接工作”“正在进行工作”“其他”必须保留在对应记录的 section 字段中，不能单独丢弃。',
+    '如果文本来自工作清单表，请把每项单独整理成一行，保留所属分区，格式优先为：工作记录：分区=正在进行工作；序号=1；内容=打印手卡、Bingo卡、感谢卡；截止日期=5.25；备注=。',
+    '如果文本来自课程表，请把每门课单独整理成一行，格式固定为：课表记录：星期=星期二；节次=1-2节；课程=现代设计方法；周次=1-2周；校区=蠡湖；地点=1教1B112多；教师=牟彦铭；班级=机械2305;机械2306；性质=C1；考核=考查；学分=2.0。缺失字段留空。',
+    '严禁输出思考过程、分析过程、<think>、解释、Markdown、代码块或总结。',
+    '输出要求：表格优先输出 <schedule_records>JSON数组</schedule_records>；如果无法输出 JSON，才输出多行“工作记录/课表记录/日程记录”。'
+  ].join('\n');
+
+  const userPrompt=[
+    '请清洗下面的 OCR 文本：',
+    '',
+    text
+  ].join('\n');
+
+  const res=await fetch(config.apiUrl,{
+    method:'POST',
+    headers:{
+      'Authorization':`Bearer ${config.apiKey}`,
+      'Content-Type':'application/json'
+    },
+    body:JSON.stringify({
+      model:config.model,
+      messages:[
+        {role:'system',content:systemPrompt},
+        {role:'user',content:userPrompt}
+      ],
+      stream:false
+    })
+  });
+
+  const data=await res.json().catch(()=>({}));
+  if(!res.ok){
+    const detail=(data.error&&data.error.message)||(data.base_resp&&data.base_resp.status_msg)||res.statusText;
+    throw new Error(`MiniMax HTTP ${res.status}: ${detail}`);
+  }
+
+  const content=sanitizeMiniMaxCleanedText(extractMiniMaxContent(data));
+  if(!content) throw new Error('MiniMax did not return cleaned text');
+  return content;
+}
+
+function splitNoticeBlocks(text){
+  const paragraphs = String(text || '')
+    .split(/\n\s*\n+/)
+    .map(x=>x.trim())
+    .filter(Boolean);
+
+  if(paragraphs.length > 1) return mergeMetaBlocks(paragraphs);
+
+  const lines = String(text || '').split('\n').map(x=>x.trim()).filter(Boolean);
+  const blocks = [];
+  let current = [];
+
+  lines.forEach(line=>{
+    const candidate = line.replace(/^@全体成员/,'').trim();
+    const currentText = current.join('\n');
+    const startsNew =
+      current.length &&
+      hasActionableContent(currentText) &&
+      isLikelyNoticeStart(candidate);
+
+    if(startsNew){
+      blocks.push(current.join('\n'));
+      current = [line];
+    }else{
+      current.push(line);
+    }
+  });
+
+  if(current.length) blocks.push(current.join('\n'));
+  if(blocks.length <= 1) return [String(text || '').trim()];
+
+  const shortFragments = blocks.filter(x => x.length < 18).length;
+  if(shortFragments >= Math.floor(blocks.length / 2)) return [text];
+
+  return mergeMetaBlocks(blocks);
+}
+
+function isMetaOnlyBlock(block){
+  const raw = String(block || '').trim();
+  if(!raw) return true;
+
+  const withoutLinks = raw
+    .replace(/https?:\/\/\S+/g,'')
+    .replace(/【腾讯文档】/g,'')
+    .replace(/腾讯文档/g,'')
+    .replace(/链接[:：]?/g,'')
+    .trim();
+
+  const hasRealTime = /(?:20\d{2}年|\d{1,2}月\d{1,2}[日号]|今天|明天|上午|下午|晚上|中午|\d{1,2}[:：]\d{2}|\d{1,2}点)/.test(withoutLinks);
+  const hasAction = /召开|举行|开展|组织|参加|举办|集合|出发|返回|截止|报名|提交|考试|会议|活动|参观|作业/.test(withoutLinks);
+
+  return /^【[^】]+】/.test(raw) && !hasRealTime && !hasAction;
+}
+
+function mergeMetaBlocks(blocks){
+  const merged = [];
+
+  blocks.forEach(block=>{
+    const current = String(block || '').trim();
+    if(!current) return;
+
+    if(merged.length && (isMetaOnlyBlock(current) || /^https?:\/\//.test(current) || /^【腾讯文档】/.test(current))){
+      merged[merged.length - 1] += '\n' + current;
+    }else{
+      merged.push(current);
+    }
+  });
+
+  return merged.length ? merged : blocks;
+}
+
+function hasActionableContent(text){
+  return /(?:20\d{2}年|\d{1,2}月\d{1,2}[日号]|今天|明天|后天|上午|下午|晚上|中午|\d{1,2}[:：]\d{2}|\d{1,2}点|截止|报名|提交|会议|考试|活动|讲座|作业|集合|签到)/.test(String(text || ''));
+}
+
+function isLikelyNoticeStart(line){
+  const text = String(line || '').trim();
+  if(!text || isBreakKeywordLine(text) || isUrlLikeLine(text)) return false;
+  if(/^【[^】]+】/.test(text) && /通知|会议|活动|报名|考试|讲座|作业|安排/.test(text)) return true;
+  if(/^(今天|今日|明天|后天|本周|下周|周[一二三四五六日天]|星期[一二三四五六日天])/.test(text) && /通知|会议|活动|报名|考试|讲座|作业|集合|签到/.test(text)) return true;
+  if(/^\d{1,2}月\d{1,2}[日号]?/.test(text) && /通知|会议|活动|报名|考试|讲座|作业|集合|签到/.test(text)) return true;
+  return false;
+}
+
+function getCategoryColor(category){
+  let hash = 0;
+  for(let i=0;i<category.length;i++){
+    hash = category.charCodeAt(i) + ((hash << 5) - hash);
+  }
+
+  const colors = [
+    'bg-cyan-400/20 text-cyan-200 border-cyan-400/30',
+    'bg-purple-400/20 text-purple-200 border-purple-400/30',
+    'bg-pink-400/20 text-pink-200 border-pink-400/30',
+    'bg-emerald-400/20 text-emerald-200 border-emerald-400/30',
+    'bg-yellow-400/20 text-yellow-200 border-yellow-400/30',
+    'bg-orange-400/20 text-orange-200 border-orange-400/30',
+    'bg-blue-400/20 text-blue-200 border-blue-400/30'
+  ];
+
+  return colors[Math.abs(hash) % colors.length];
+}
+
+function detectCategory(text){
+  const rules = [
+    {name:'考试', regex:/考试|测验|考核|补考|期中|期末|四六级/},
+    {name:'会议', regex:/会议|动员会|例会|班会|宣讲会|报告会/},
+    {name:'课程', regex:/课程|课表|节次|教学班|学分|校区|场地|教师/},
+    {name:'活动', regex:/活动|讲座|比赛|竞赛|志愿|社团|招新|参观|实践|研学|交流|出发|集合/},
+    {name:'报名', regex:/报名|填写|招募|申请|缴费|登记|征集/},
+    {name:'作业', regex:/作业|习题|提交|上传|论文|课程任务|实验报告(?!厅)/}
+  ];
+
+  const hit = rules.find(rule => rule.regex.test(text));
+  return hit ? hit.name : (categories[0] || '未分类');
+}
+
+function parseNotice(block){
+  block = String(block || '').trim();
+  const title = extractTitle(block);
+  const location = extractLocation(block);
+  const timeInfo = extractTimeRange(block);
+  const deadline = extractDeadline(block);
+  const links = extractLinks(block);
+  const supplement = extractSupplement(block);
+  const content = cleanupContent(block);
+
+  const category = detectCategory(block);
+  const important = /会议|征兵|考试|作业|报名|缴费|课程|ddl|DDL|截止|提交|测验|签到|工作|参观|集合/.test(block);
+  const urgent = /今天|今晚|明天|后天|本周|截止|ddl|DDL|立即|尽快|前|下午|上午|报名/.test(block);
+
+  return {
+    title,
+    start: timeInfo.start || '待确认',
+    end: timeInfo.end || '待确认',
+    deadline: deadline || '无',
+    links,
+    supplement: supplement || '无',
+    location: location || '待确认',
+    content,
+    category,
+    importance: important ? 'high' : 'low',
+    urgency: urgent ? 'high' : 'low'
+  };
+}
+
+
+function isKnownEmptyTime(value){
+  const text = String(value || '').trim();
+  return !text || text === '待确认' || text === '无';
+}
+
+function normalizeTaskTemporalFields(task){
+  if(!task) return task;
+
+  task.start = normalizeEditableTime(task.start || '待确认');
+  task.end = normalizeEditableTime(task.end || '待确认');
+  task.deadline = normalizeEditableTime(task.deadline || '无');
+
+  if(isKnownEmptyTime(task.start) && !isKnownEmptyTime(task.end)){
+    task.start = task.end;
+  }
+
+  if(!isKnownEmptyTime(task.start) && isKnownEmptyTime(task.end)){
+    task.end = task.start;
+  }
+
+  return task;
+}
+
+function isValidParsedTask(task){
+  if(!task) return false;
+
+  const hasTitle = task.title && task.title !== '通知事项';
+  const hasTime = !isKnownEmptyTime(task.start) || !isKnownEmptyTime(task.end) || !isKnownEmptyTime(task.deadline);
+  const hasPlaceOrContent = (task.location && task.location !== '待确认') || (task.content && task.content.length > 8);
+
+  return hasTitle || hasTime || hasPlaceOrContent;
+}
+
+function getTaskEventDateTime(task){
+  if(!task) return '';
+  if(!isKnownEmptyTime(task.start)) return task.start;
+  if(!isKnownEmptyTime(task.end)) return task.end;
+  return '';
+}
+
+function stripLeadingDateWords(value){
+  return String(value || '')
+    .replace(/^@全体成员/,'')
+    .replace(/^【[^】]+】/,'')
+    .replace(/^通知[:：]?/,'')
+    .replace(/^(20\d{2}年)?\s*\d{1,2}\s*月\s*\d{1,2}\s*[日号]?\s*/,'')
+    .replace(/^(今天|今日|明天|后天)?\s*(本周|下周|这周)?\s*(周|星期)?[一二三四五六日天]?\s*/,'')
+    .replace(/^(上午|下午|晚上|今晚|中午)\s*/,'')
+    .replace(/[，。,；;]+$/,'')
+    .trim();
+}
+
+function extractTitle(text){
+  const raw = String(text || '');
+  const docTitle = raw.match(/【[^】]*文档[^】]*】\s*([^\n]+)/);
+  if(docTitle){
+    const v = stripLeadingDateWords(docTitle[1]).replace(/报名表|通知/g,'').trim();
+    if(v.length >= 4 && v.length <= 40) return v;
+  }
+
+  const lines = raw
+    .split('\n')
+    .map(x=>x.trim())
+    .filter(Boolean);
+
+  const nonMeta = lines.find(line=>{
+    const clean = removeParentheticalText(line).trim();
+    return clean &&
+      !isBreakKeywordLine(clean) &&
+      !isUrlLikeLine(clean) &&
+      !/^(时间|开始时间|截止时间|报名截止时间|结束时间|地点|日期|报名|签到|链接|网址|补充|备注|说明|要求)[:：]?/.test(clean);
+  });
+  let source = stripLeadingDateWords(removeParentheticalText(nonMeta || lines[0] || raw).replace(/^【|】$/g,'').trim());
+  source = source
+    .replace(/https?:\/\/\S+/g,'')
+    .replace(/www\.\S+/g,'')
+    .replace(/^(关于|请各位|请大家|现将|现组织|将于)/,'')
+    .trim();
+
+  const about = source.match(/(?:开展|举办|组织|参加|召开|举行)?(.{2,40}?)(?:的)?(?:通知|安排|报名|报名表)$/);
+  if(about && about[1]) return stripLeadingDateWords(about[1]);
+
+  const visit = source.match(/(?:组织|参加|前往|去)([^，。,.；;]*?(?:参观|活动|会议|讲座|比赛|考试|动员会|报名))/);
+  if(visit) return stripLeadingDateWords(visit[1]);
+
+  const actionMatch = source.match(/(?:召开|举行|开展|组织|参加|举办)([^，。,.；;]*?(会议|动员会|报名|考试|活动|讲座|报告会|宣讲会|参观))/);
+  if(actionMatch) return stripLeadingDateWords(actionMatch[1]);
+
+  const keyword = source.match(/([^，。,.；;]{2,36}(会议|动员会|报名|考试|活动|讲座|通知|报告会|宣讲会|参观))/);
+  if(keyword) return stripLeadingDateWords(keyword[1]);
+
+  const firstSentence = source.split(/[，。,.；;]/)[0];
+  return firstSentence.length <= 36 ? firstSentence.trim() : '通知事项';
+}
+
+function extractLocation(text){
+  const raw = String(text || '').replace(/\s+/g,'');
+  const explicit = raw.match(/(?:地点|集合地点|活动地点)[:：]?([^\n，。,.；;]+)/);
+  if(explicit) return explicit[1].replace(/链接[:：]?.*$/,'').trim();
+
+  const locations = [];
+  const gather = raw.match(/(\d{1,2}(?:[:：]\d{2}|点(?:\d{1,2}分?|半)?)?)(?:在)?([^，。,.；;\n]{2,24}?(?:门口|大厅|报告厅|教室|会议室|操场|中心|学院|学校|馆|楼|室))集合/);
+  if(gather) locations.push(`${gather[2]}集合`);
+
+  const dest = raw.match(/(?:去|前往|赴|到)([^，。,.；;\n]{2,40}?(?:中心|基地|馆|学校|学院|公司|园区|校区|无锡|南京|上海|北京))(?:参观|交流|学习|活动)?/);
+  if(dest) locations.push(dest[1].replace(/[（）()]*$/,'').trim());
+
+  return [...new Set(locations)].join('；');
+}
+
+function getBaseYear(){
+  return getTodayPartsForCalendar().year;
+}
+
+function toDateString(year,month,day){
+  return `${year}-${String(month).padStart(2,'0')}-${String(day).padStart(2,'0')}`;
+}
+
+function getActiveTimeZone(){
+  const select=document.getElementById('timeZoneSelect');
+  const custom=document.getElementById('customTimeZone');
+  const value=select ? select.value : 'Asia/Shanghai';
+  const tz=value==='custom' ? (custom && custom.value.trim()) : value;
+  return tz || 'Asia/Shanghai';
+}
+
+function getDatePartsInTimeZone(date=new Date(),timeZone=getActiveTimeZone()){
+  try{
+    const parts=new Intl.DateTimeFormat('en-CA',{
+      timeZone,
+      year:'numeric',
+      month:'2-digit',
+      day:'2-digit'
+    }).formatToParts(date);
+    const map=Object.fromEntries(parts.map(part=>[part.type,part.value]));
+    return {
+      year:Number(map.year),
+      month:Number(map.month),
+      day:Number(map.day)
+    };
+  }catch(err){
+    console.warn('Invalid timezone, fallback to Asia/Shanghai:',timeZone,err);
+    return getDatePartsInTimeZone(date,'Asia/Shanghai');
+  }
+}
+
+function dateKeyToParts(dateKey){
+  const m=String(dateKey||'').match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if(!m) return null;
+  return {year:Number(m[1]),month:Number(m[2]),day:Number(m[3])};
+}
+function parseFlexibleReferenceDate(value){
+  const raw=String(value||'').trim();
+  if(!raw) return '';
+
+  let m=raw.match(/^(20\d{2})[-/.年]\s*(\d{1,2})[-/.月]\s*(\d{1,2})\s*[日号]?$/);
+  if(m) return toDateString(m[1],m[2],m[3]);
+
+  m=raw.match(/^(\d{1,2})\s*(?:[.月/-])\s*(\d{1,2})\s*[日号]?$/);
+  if(m) return toDateString(getBaseYear(),m[1],m[2]);
+
+  return '';
+}
+
+function syncQuickReferenceInput(){
+  const quick=document.getElementById('quickReferenceDateInput');
+  const reference=document.getElementById('referenceDateInput');
+  if(!quick || !reference) return;
+  if(reference.value){
+    const parts=dateKeyToParts(reference.value);
+    quick.value=parts ? `${parts.month}.${parts.day}` : '';
+  }else{
+    quick.value='';
+  }
+}
+
+function applyQuickReferenceDate(){
+  const quick=document.getElementById('quickReferenceDateInput');
+  const reference=document.getElementById('referenceDateInput');
+  if(!quick || !reference) return;
+
+  const parsed=parseFlexibleReferenceDate(quick.value);
+  if(!parsed){
+    quick.value='';
+    quick.placeholder='格式示例：5.21 / 5月21日 / 2026-05-21';
+    return;
+  }
+
+  reference.value=parsed;
+  syncQuickReferenceInput();
+  updateTimeContextLabel();
+  goToToday();
+}
+
+function handleQuickReferenceKey(event){
+  if(event.key==='Enter'){
+    event.preventDefault();
+    applyQuickReferenceDate();
+  }
+}
+
+
+function getReferenceDateKey(){
+  const input=document.getElementById('referenceDateInput');
+  if(input && /^\d{4}-\d{2}-\d{2}$/.test(input.value)) return input.value;
+  const parts=getDatePartsInTimeZone(new Date(),getActiveTimeZone());
+  return toDateString(parts.year,parts.month,parts.day);
+}
+
+function addDaysToDateKey(dateKey,days){
+  const parts=dateKeyToParts(dateKey);
+  if(!parts) return dateKey;
+  const date=new Date(Date.UTC(parts.year,parts.month-1,parts.day+days));
+  return toDateString(date.getUTCFullYear(),date.getUTCMonth()+1,date.getUTCDate());
+}
+
+function getTimeZoneDisplayName(){
+  const select=document.getElementById('timeZoneSelect');
+  if(!select) return '北京时间';
+  if(select.value==='custom') return getActiveTimeZone();
+  const option=select.options[select.selectedIndex];
+  return option ? option.textContent.split(' ')[0] : getActiveTimeZone();
+}
+
+function updateTimeContextLabel(){
+  const label=document.getElementById('timeContextLabel');
+  if(!label) return;
+  const reference=getReferenceDateKey();
+  label.textContent=`${getTimeZoneDisplayName()} · 基准 ${reference} · 明天 ${addDaysToDateKey(reference,1)}`;
+  try{localStorage.setItem('scheduleTimeContext',JSON.stringify({
+    timezonePreset:document.getElementById('timeZoneSelect')?.value || 'Asia/Shanghai',
+    customTimezone:document.getElementById('customTimeZone')?.value || 'Asia/Shanghai',
+    referenceDate:document.getElementById('referenceDateInput')?.value || ''
+  }));}catch(err){}
+  renderCalendar();
+}
+
+function handleTimezonePresetChange(){
+  const select=document.getElementById('timeZoneSelect');
+  const custom=document.getElementById('customTimeZone');
+  if(select && custom && select.value!=='custom') custom.value=select.value;
+  updateTimeContextLabel();
+}
+
+function resetReferenceDate(){
+  const input=document.getElementById('referenceDateInput');
+  if(input) input.value='';
+  syncQuickReferenceInput();
+  updateTimeContextLabel();
+  goToToday();
+}
+
+function initTimeContextSettings(){
+  const select=document.getElementById('timeZoneSelect');
+  const custom=document.getElementById('customTimeZone');
+  const reference=document.getElementById('referenceDateInput');
+  if(!select || !custom || !reference) return;
+  try{
+    const saved=JSON.parse(localStorage.getItem('scheduleTimeContext')||'{}');
+    select.value=saved.timezonePreset || 'Asia/Shanghai';
+    custom.value=saved.customTimezone || select.value || 'Asia/Shanghai';
+    reference.value=saved.referenceDate || '';
+  }catch(err){
+    select.value='Asia/Shanghai';
+    custom.value='Asia/Shanghai';
+    reference.value='';
+  }
+  if(select.value!=='custom') custom.value=select.value;
+  syncQuickReferenceInput();
+  updateTimeContextLabel();
+}
+
+function getTodayPartsForCalendar(){
+  const parts=dateKeyToParts(getReferenceDateKey()) || getDatePartsInTimeZone(new Date(),getActiveTimeZone());
+  return parts;
+}
+
+function normalizeHourByPeriod(hour,period){
+  let h = parseInt(hour,10);
+  const p = period || '';
+  if((p.includes('下午') || p.includes('晚上')) && h < 12) h += 12;
+  if(p.includes('中午') && h < 11) h += 12;
+  return h;
+}
+
+function parseClockExpression(expr, fallbackPeriod=''){
+  const value = String(expr || '');
+  let m = value.match(/(上午|下午|晚上|中午)?\s*(\d{1,2})[:：](\d{2})/);
+  if(m){
+    const h = normalizeHourByPeriod(m[2], m[1] || fallbackPeriod);
+    return `${String(h).padStart(2,'0')}:${m[3]}`;
+  }
+
+  m = value.match(/(上午|下午|晚上|中午)?\s*(\d{1,2})\s*点\s*(半|\d{1,2}\s*分?)?/);
+  if(m){
+    const h = normalizeHourByPeriod(m[2], m[1] || fallbackPeriod);
+    let minute = '00';
+    if(m[3]){
+      if(m[3].includes('半')) minute = '30';
+      else minute = String(parseInt(m[3],10)).padStart(2,'0');
+    }
+    return `${String(h).padStart(2,'0')}:${minute}`;
+  }
+
+  return '';
+}
+
+function getChineseWeekdayNumber(dayText){
+  const map={一:1,二:2,三:3,四:4,五:5,六:6,日:7,天:7};
+  return map[String(dayText||'').trim()] || null;
+}
+
+function getWeekdayDateKey(weekToken,dayText){
+  const target=getChineseWeekdayNumber(dayText);
+  const baseParts=dateKeyToParts(getReferenceDateKey());
+  if(!target || !baseParts) return '';
+
+  const baseDate=new Date(Date.UTC(baseParts.year,baseParts.month-1,baseParts.day));
+  const baseWeekday=baseDate.getUTCDay() || 7;
+  const token=String(weekToken||'').replace(/\s+/g,'');
+
+  let weekOffsetDays=0;
+  if(/^下下/.test(token)) weekOffsetDays=14;
+  else if(/^下/.test(token)) weekOffsetDays=7;
+  else if(/^上/.test(token)) weekOffsetDays=-7;
+  else if(/^(本|这|这个)/.test(token)) weekOffsetDays=0;
+  else weekOffsetDays=target>=baseWeekday ? 0 : 7;
+
+  const deltaToMonday=1-baseWeekday;
+  const result=new Date(Date.UTC(baseParts.year,baseParts.month-1,baseParts.day+deltaToMonday+weekOffsetDays+target-1));
+  return toDateString(result.getUTCFullYear(),result.getUTCMonth()+1,result.getUTCDate());
+}
+
+function findDateMentions(text){
+  const source=String(text||'');
+  const mentions = [];
+  const year = getBaseYear();
+  let m;
+  const fullRe = /(20\d{2})[-/.年](\d{1,2})[-/.月](\d{1,2})[日号]?/g;
+  while((m = fullRe.exec(source))){
+    mentions.push({index:m.index, date:toDateString(m[1],m[2],m[3]), text:m[0]});
+  }
+
+  const mdRe = /(上午|下午|晚上|中午)?\s*(\d{1,2})\s*月\s*(\d{1,2})\s*[日号]?\s*(上午|下午|晚上|中午)?/g;
+  while((m = mdRe.exec(source))){
+    mentions.push({index:m.index, date:toDateString(year,m[2],m[3]), text:m[0], period:m[1] || m[4] || ''});
+  }
+
+  const relativeMap={
+    '今天':{days:0},
+    '今日':{days:0},
+    '今晚':{days:0,period:'晚上'},
+    '明天':{days:1},
+    '明日':{days:1},
+    '明晚':{days:1,period:'晚上'},
+    '后天':{days:2},
+    '后日':{days:2}
+  };
+  const relativeRe=/今天|今日|今晚|明天|明日|明晚|后天|后日/g;
+  const baseDate=getReferenceDateKey();
+  while((m=relativeRe.exec(source))){
+    const item=relativeMap[m[0]];
+    mentions.push({index:m.index,date:addDaysToDateKey(baseDate,item.days),text:m[0],period:item.period||''});
+  }
+
+  const weekRe=/((?:下下个|下下|下个|这个|本|这|下|上)?(?:周|星期|礼拜))\s*([一二三四五六日天])/g;
+  while((m=weekRe.exec(source))){
+    const date=getWeekdayDateKey(m[1],m[2]);
+    if(date) mentions.push({index:m.index,date,text:m[0]});
+  }
+
+  return mentions.sort((a,b)=>a.index-b.index);
+}
+
+function dateForIndex(mentions,pos){
+  let current = mentions[0] || null;
+  mentions.forEach(item=>{ if(item.index <= pos) current = item; });
+  return current;
+}
+
+function periodNear(text,pos,mention){
+  const windowText = text.slice(Math.max(0,pos-16), Math.min(text.length,pos+12));
+  const local = windowText.match(/上午|下午|晚上|中午/);
+  return (local && local[0]) || (mention && mention.period) || '';
+}
+
+function extractDeadline(text){
+  const raw = String(text || '').replace(/\s+/g,'');
+  const deadlineMatch =
+    raw.match(/(?:报名|提交|缴费|申请|填写)?截止(?:时间|日期)?[:：]?([^。；;\n]*)/i) ||
+    raw.match(/(?:ddl|DDL)[:：]?([^。；;\n]*)/) ||
+    raw.match(/((?:20\d{2}年)?\d{1,2}月\d{1,2}[日号]?(?:上午|下午|晚上|中午)?(?:\d{1,2}(?:[:：]\d{2}|点(?:半|\d{1,2}分?)?)?)?前)/);
+  if(!deadlineMatch) return '';
+
+  const segment = deadlineMatch[0];
+  const date = findDateMentions(segment)[0] || findDateMentions(raw).find(x=>x.index >= deadlineMatch.index);
+  const clock = parseClockExpression(segment, periodNear(segment,0,date));
+  if(date && clock) return `${date.date} ${clock}`;
+  if(date) return `${date.date} 23:59`;
+  return '';
+}
+
+function removeDeadlineText(text){
+  return String(text || '')
+    .replace(/(?:报名|提交|缴费|申请|填写)?截止(?:时间|日期)?[:：]?[^。；;\n]*/gi,'')
+    .replace(/(?:ddl|DDL)[:：]?[^。；;\n]*/g,'')
+    .replace(/(?:20\d{2}年)?\d{1,2}月\d{1,2}[日号]?(?:上午|下午|晚上|中午)?(?:\d{1,2}(?:[:：]\d{2}|点(?:半|\d{1,2}分?)?)?)?前/g,'');
+}
+
+function extractTimeRange(text){
+  const raw = removeDeadlineText(text).replace(/\s+/g,'');
+  const mentions = findDateMentions(raw);
+  if(!mentions.length) return {start:'',end:''};
+
+  let m = raw.match(/((?:上午|下午|晚上|中午)?(?:\d{1,2}[:：]\d{2}|\d{1,2}点(?:半|\d{1,2}分?)?))[-~至到]((?:上午|下午|晚上|中午)?(?:\d{1,2}[:：]\d{2}|\d{1,2}点(?:半|\d{1,2}分?)?))/);
+  if(m){
+    const pos = m.index || 0;
+    const date = dateForIndex(mentions,pos);
+    const p = periodNear(raw,pos,date);
+    const startClock = parseClockExpression(m[1], p);
+    const endClock = parseClockExpression(m[2], p);
+    return {start:`${date.date} ${startClock}`, end:`${date.date} ${endClock}`};
+  }
+
+  const timeRe = /(?:上午|下午|晚上|中午)?(?:\d{1,2}[:：]\d{2}|\d{1,2}\s*点\s*(?:半|\d{1,2}\s*分?)?)/g;
+  const hits = [];
+  while((m = timeRe.exec(raw))){
+    const pos = m.index;
+    const date = dateForIndex(mentions,pos);
+    const period = periodNear(raw,pos,date);
+    const clock = parseClockExpression(m[0], period);
+    const after = raw.slice(pos, pos + 16);
+    const before = raw.slice(Math.max(0,pos - 12), pos);
+    const isDeadline = /截止|ddl|DDL/.test(before + after);
+    if(date && clock && !isDeadline){
+      hits.push({pos,date:date.date,clock,after,before});
+    }
+  }
+
+  if(hits.length >= 2){
+    const startHit = hits.find(h=>/集合|出发|开始|签到/.test(h.after)) || hits[0];
+    const endHit = hits.find(h=>/返回|结束|截止/.test(h.after)) || hits[hits.length-1];
+    return {start:`${startHit.date} ${startHit.clock}`, end:`${endHit.date} ${endHit.clock}`};
+  }
+
+  if(hits.length === 1){
+    return {start:`${hits[0].date} ${hits[0].clock}`, end:`${hits[0].date} ${hits[0].clock}`};
+  }
+
+  return {start:`${mentions[0].date} 00:00`, end:`${mentions[0].date} 23:59`};
+}
+
+function extractLinks(text){
+  const raw = String(text || '');
+  const links = [];
+  const urlRe = /(?:https?:\/\/|www\.|docs\.qq\.com\/|kdocs\.cn\/|pan\.baidu\.com\/|meeting\.tencent\.com\/|wj\.qq\.com\/)[^\s，。；;）)】]+/ig;
+  let m;
+
+  while((m = urlRe.exec(raw))){
+    let url = m[0]
+      .replace(/[，。；;、]+$/,'')
+      .trim();
+    if(/^www\./i.test(url)) url = `https://${url}`;
+    if(url) links.push(url);
+  }
+
+  const explicit = raw.match(/(?:链接|网址|报名链接)[:：]\s*([^\n，。；;]+)/);
+  if(explicit){
+    const value = explicit[1].trim();
+    if(value && !links.includes(value) && /(?:https?:\/\/|www\.|\.com|\.cn|腾讯文档|二维码)/i.test(value)){
+      links.push(/^www\./i.test(value) ? `https://${value}` : value);
+    }
+  }
+
+  return [...new Set(links)];
+}
+
+
+function extractSupplement(text){
+  const raw = String(text || '');
+  const items = [];
+  const re = /[（(]([^（）()]{1,120})[）)]/g;
+  let m;
+
+  while((m = re.exec(raw))){
+    const value = m[1]
+      .replace(/\s+/g,'')
+      .replace(/[，。；;、]+$/,'')
+      .trim();
+
+    if(value && !/^https?:\/\//.test(value) && !/^www\./i.test(value)){
+      items.push(value);
+    }
+  }
+
+  const explicit = raw.match(/(?:补充|备注|说明|要求)[:：]\s*([^\n]+)/);
+  if(explicit && explicit[1].trim()){
+    items.push(explicit[1].replace(/[，。；;、]+$/,'').trim());
+  }
+
+  return [...new Set(items)].join('；');
+}
+
+function removeParentheticalText(text){
+  return String(text || '').replace(/[（(][^（）()]{1,120}[）)]/g,'');
+}
+
+function normalizeLinks(value){
+  const raw = String(value || '').trim();
+  if(!raw || raw === '无') return [];
+  return extractLinks(raw).length ? extractLinks(raw) : raw.split(/[\n；;,，]+/).map(x=>x.trim()).filter(Boolean);
+}
+
+function renderLinksValue(links){
+  const list = Array.isArray(links) ? links : normalizeLinks(links);
+  return list.length ? list.join('\n') : '无';
+}
+
+function linksHTML(links){
+  const list = Array.isArray(links) ? links : normalizeLinks(links);
+  if(!list.length) return '<span class="text-slate-500">无</span>';
+
+  return list.map(link=>{
+    const safe = escapeHTML(link);
+    if(/^https?:\/\//.test(link)){
+      return `<a href="${safe}" target="_blank" rel="noopener noreferrer" class="text-cyan-300 underline break-all">${safe}</a>`;
+    }
+    return `<span class="text-cyan-300 break-all">${safe}</span>`;
+  }).join('<br>');
+}
+
+function escapeJS(value){
+  return String(value ?? '')
+    .replace(/\\/g,'\\\\')
+    .replace(/'/g,"\\'")
+    .replace(/\r/g,'')
+    .replace(/\n/g,'\\n');
+}
+
+function glassSelectHTML(index,field,current,options){
+  const selected = options.find(item=>item.value===current) || options[0] || {value:'',label:'未设置'};
+  const optionHTML = options.map(item=>{
+    const isSelected = item.value === current;
+    return `<button type="button" role="option" aria-selected="${isSelected?'true':'false'}" class="glass-select-option ${isSelected?'selected':''}" onclick="chooseGlassSelect(event,${index},'${field}','${escapeJS(item.value)}')">${escapeHTML(item.label)}</button>`;
+  }).join('');
+
+  return `<div class="glass-select" data-field="${field}">
+    <button type="button" class="glass-select-trigger" onclick="toggleGlassSelect(event,this)" aria-haspopup="listbox" aria-expanded="false">
+      <span>${escapeHTML(selected.label)}</span><span class="glass-select-arrow">⌄</span>
+    </button>
+    <div class="glass-select-menu" role="listbox">${optionHTML}</div>
+  </div>`;
+}
+
+function closeGlassSelects(){
+  document.querySelectorAll('.glass-select.open').forEach(select=>{
+    select.classList.remove('open');
+    select.closest('.task-card')?.classList.remove('select-open');
+    select.closest('.quadrant')?.classList.remove('select-open');
+    const trigger=select.querySelector('.glass-select-trigger');
+    if(trigger) trigger.setAttribute('aria-expanded','false');
+  });
+}
+
+function toggleGlassSelect(event,trigger){
+  event.stopPropagation();
+  const select=trigger.closest('.glass-select');
+  if(!select) return;
+  const shouldOpen=!select.classList.contains('open');
+  closeGlassSelects();
+  if(shouldOpen){
+    select.classList.add('open');
+    select.closest('.task-card')?.classList.add('select-open');
+    select.closest('.quadrant')?.classList.add('select-open');
+    trigger.setAttribute('aria-expanded','true');
+  }
+}
+
+function chooseGlassSelect(event,index,field,value){
+  event.stopPropagation();
+  closeGlassSelects();
+  if(field==='category') updateCategory(index,value);
+  if(field==='importance') updateImportance(index,value);
+  if(field==='urgency') updateUrgency(index,value);
+  refreshTaskModal(index);
+}
+
+function cleanupContent(text){
+  return formatOCRText(removeParentheticalText(sanitizeMiniMaxCleanedText(text)))
+    .replace(/(?:https?:\/\/|www\.)\S+/g,'[链接]')
+    .replace(/(?:docs\.qq\.com|kdocs\.cn|pan\.baidu\.com|meeting\.tencent\.com|wj\.qq\.com)\/\S+/ig,'[链接]')
+    .replace(/^@全体成员/,'')
+    .replace(/\n/g,'；')
+    .replace(/；{2,}/g,'；')
+    .replace(/(?:让我|我需要|需要|首先|接下来|注意到|应该|可以|这是)[^；。]{0,80}[；。]/g,'')
+    .slice(0,180)
+    .trim();
+}
+
+function confirmAddTasks(){pendingTasks.forEach(ensureTaskId);tasks.push(...pendingTasks);pendingTasks=[];pendingAddMode='normal';const confirmBtn=document.getElementById('confirmBtn');confirmBtn.innerText='确认添加';confirmBtn.classList.add('opacity-40','pointer-events-none');renderQuadrants();renderCalendar()}
+function escapeHTML(value){
+  return String(value ?? '')
+    .replace(/&/g,'&amp;')
+    .replace(/</g,'&lt;')
+    .replace(/>/g,'&gt;')
+    .replace(/"/g,'&quot;')
+    .replace(/'/g,'&#039;');
+}
+
+function normalizeEditableTime(value){
+  const text=String(value||'').trim();
+
+  if(/^20\d{2}-\d{1,2}-\d{1,2}\s+\d{1,2}:\d{2}$/.test(text)){
+    const [d,t]=text.split(/\s+/);
+    const [y,m,day]=d.split('-');
+    const [h,min]=t.split(':');
+    return `${y}-${m.padStart(2,'0')}-${day.padStart(2,'0')} ${h.padStart(2,'0')}:${min}`;
+  }
+
+  if(/^20\d{2}-\d{1,2}-\d{1,2}$/.test(text)){
+    const [y,m,day]=text.split('-');
+    return `${y}-${m.padStart(2,'0')}-${day.padStart(2,'0')} 00:00`;
+  }
+
+  return text;
+}
+
+function updateTaskField(index,field,value){
+  if(!tasks[index]) return;
+
+  let newValue=String(value||'').trim();
+
+  if(field==='start' || field==='end' || field==='deadline'){
+    newValue=normalizeEditableTime(newValue);
+  }
+
+  if(field==='links'){
+    newValue=normalizeLinks(newValue);
+  }
+
+  tasks[index][field]=newValue;
+
+  renderQuadrants();
+  renderCalendar();
+}
+
+function getTaskDateTimeValue(task){
+  const source = getTaskEventDateTime(task) || task.deadline;
+  const time = Date.parse(String(source).replace(/-/g,'/'));
+  return Number.isNaN(time) ? Number.MAX_SAFE_INTEGER : time;
+}
+
+function getTaskTimeLabel(task){
+  const start = !isKnownEmptyTime(task.start) ? extractHourMinute(task.start) : '';
+  const end = !isKnownEmptyTime(task.end) ? extractHourMinute(task.end) : '';
+
+  if(start && end && start !== end) return `${start}—${end}`;
+  if(start) return start;
+  if(end) return end;
+  return '时间待确认';
+}
+
+function extractHourMinute(value){
+  const m = String(value||'').match(/(\d{1,2}):(\d{2})/);
+  return m ? `${m[1].padStart(2,'0')}时${m[2]}分` : '';
+}
+
+function compactDateValue(value,fallback='待确认'){
+  const text=String(value||'').trim();
+  return text || fallback;
+}
+
+function compactTaskHTML(task,index){
+  const taskId = ensureTaskId(task);
+  const isDone = !!task.done;
+
+  return `<div class="task-card compact-task-card glass rounded-2xl border border-white/10 relative ${isDone ? 'opacity-60' : ''}" data-task-index="${index}" data-task-id="${taskId}" onclick="openTaskModalById('${taskId}')">
+    <div class="compact-task-title font-black highlight ${isDone ? 'line-through' : ''}">${escapeHTML(task.title || '未命名日程')}</div>
+
+    <div class="compact-card-actions">
+      <button onclick="event.stopPropagation();completeTaskById('${taskId}', this)" class="do-btn compact-do-btn bg-emerald-500/20 text-emerald-200 border border-emerald-400/30 hover:bg-emerald-500/30 transition">
+        <span class="do-label">Do</span>
+        <span class="do-check" aria-hidden="true">
+          <svg width="28" height="28" viewBox="0 0 30 30" fill="none">
+            <circle class="do-check-circle" cx="15" cy="15" r="11.5" stroke="#4ade80" stroke-width="3"/>
+            <path class="do-check-mark" d="M9 15.5L13.2 19.5L21.5 10.5" stroke="#4ade80" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+        </span>
+      </button>
+      <button onclick="event.stopPropagation();deleteTaskById('${taskId}', this)" class="compact-delete-btn bg-red-500/20 text-red-200 border border-red-400/30 hover:bg-red-500/30 transition">删除日程</button>
+    </div>
+  </div>`;
+}
+
+function fullTaskModalHTML(task,index){
+  const taskId = ensureTaskId(task);
+  const isDone = !!task.done;
+  const availableCategories = [...new Set([...(categories || []), task.category || '未分类'])];
+  const categoryOptions = availableCategories.map(cat => ({value:cat,label:cat}));
+  const categorySelect = glassSelectHTML(index,'category',task.category || '未分类',categoryOptions);
+  const importanceSelect = glassSelectHTML(index,'importance',task.importance || 'low',[
+    {value:'high',label:'重要'},
+    {value:'low',label:'不重要'}
+  ]);
+  const urgencySelect = glassSelectHTML(index,'urgency',task.urgency || 'low',[
+    {value:'high',label:'紧急'},
+    {value:'low',label:'不紧急'}
+  ]);
+
+  return `<div data-task-id="${taskId}" data-task-index="${index}">
+    <div class="flex justify-between items-start gap-5">
+      <div>
+        <div class="text-sm text-slate-400 font-bold mb-2">完整日程详情</div>
+        <div
+          class="font-black text-3xl editable-field task-modal-title-editor ${isDone ? 'line-through' : ''}"
+          contenteditable="true"
+          onblur="updateTaskField(${index},'title',this.innerText)"
+        >${escapeHTML(task.title || '未命名日程')}</div>
+      </div>
+      <div class="flex items-center gap-3">
+        <div class="text-xs px-4 py-2 rounded-full border ${getCategoryColor(task.category || '未分类')}">${escapeHTML(task.category || '未分类')}</div>
+        <button class="task-modal-close" onclick="closeTaskModal()">×</button>
+      </div>
+    </div>
+
+    <div class="task-modal-detail-grid">
+      <div class="task-modal-detail-row"><div class="task-modal-detail-label">📅 开始时间</div><div><span class="highlight editable-field" contenteditable="true" onblur="updateTaskField(${index},'start',this.innerText)">${escapeHTML(task.start || '待确认')}</span></div></div>
+      <div class="task-modal-detail-row"><div class="task-modal-detail-label">⏳ 结束时间</div><div><span class="text-pink-300 font-bold editable-field" contenteditable="true" onblur="updateTaskField(${index},'end',this.innerText)">${escapeHTML(task.end || '待确认')}</span></div></div>
+      <div class="task-modal-detail-row"><div class="task-modal-detail-label">🚨 报名/提交截止</div><div><span class="text-orange-300 font-bold editable-field" contenteditable="true" onblur="updateTaskField(${index},'deadline',this.innerText)">${escapeHTML(task.deadline || '无')}</span></div></div>
+      <div class="task-modal-detail-row"><div class="task-modal-detail-label">🔗 链接</div><div><span class="editable-block" contenteditable="true" onblur="updateTaskField(${index},'links',this.innerText)">${linksHTML(task.links)}</span></div></div>
+      <div class="task-modal-detail-row"><div class="task-modal-detail-label">💬 补充</div><div><span class="editable-block" contenteditable="true" onblur="updateTaskField(${index},'supplement',this.innerText)">${escapeHTML(task.supplement || '无')}</span></div></div>
+      <div class="task-modal-detail-row"><div class="task-modal-detail-label">📍 地点</div><div><span class="highlight editable-field" contenteditable="true" onblur="updateTaskField(${index},'location',this.innerText)">${escapeHTML(task.location || '待确认')}</span></div></div>
+      <div class="task-modal-detail-row"><div class="task-modal-detail-label">📝 内容</div><div><span class="editable-block" contenteditable="true" onblur="updateTaskField(${index},'content',this.innerText)">${escapeHTML(task.content || '')}</span></div></div>
+    </div>
+
+    <div class="task-modal-actions">
+      <div class="flex flex-wrap gap-4 items-center">
+        ${categorySelect}
+        ${importanceSelect}
+        ${urgencySelect}
+      </div>
+      <div class="flex gap-3 items-center">
+        <button onclick="completeTaskById('${taskId}', this);closeTaskModal()" class="do-btn px-5 py-2 rounded-xl bg-emerald-500/20 text-emerald-200 border border-emerald-400/30 hover:bg-emerald-500/30 transition">
+          <span class="do-label">Do</span>
+          <span class="do-check" aria-hidden="true">
+            <svg width="30" height="30" viewBox="0 0 30 30" fill="none">
+              <circle class="do-check-circle" cx="15" cy="15" r="11.5" stroke="#4ade80" stroke-width="3"/>
+              <path class="do-check-mark" d="M9 15.5L13.2 19.5L21.5 10.5" stroke="#4ade80" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
+          </span>
+        </button>
+        <button onclick="deleteTaskById('${taskId}', this);closeTaskModal()" class="px-5 py-3 rounded-xl bg-red-500/20 text-red-200 border border-red-400/30 hover:bg-red-500/30 transition font-bold">删除日程</button>
+      </div>
+    </div>
+  </div>`;
+}
+
+function taskHTML(task,index){
+  return compactTaskHTML(task,index);
+}
+
+function openTaskModalById(taskId){
+  const index = tasks.findIndex(item => ensureTaskId(item) === taskId);
+  if(index < 0) return;
+  openTaskModal(index);
+}
+
+function openTaskModal(index){
+  const task = tasks[index];
+  if(!task) return;
+  const backdrop=document.getElementById('taskModalBackdrop');
+  const panel=document.getElementById('taskModalPanel');
+  if(!backdrop || !panel) return;
+  panel.innerHTML=fullTaskModalHTML(task,index);
+  backdrop.classList.add('open');
+  document.body.style.overflow='hidden';
+}
+
+function refreshTaskModal(index){
+  const backdrop=document.getElementById('taskModalBackdrop');
+  const panel=document.getElementById('taskModalPanel');
+  if(!backdrop || !panel || !backdrop.classList.contains('open') || !tasks[index]) return;
+  panel.innerHTML=fullTaskModalHTML(tasks[index],index);
+}
+
+function closeTaskModal(){
+  closeGlassSelects();
+  const backdrop=document.getElementById('taskModalBackdrop');
+  const panel=document.getElementById('taskModalPanel');
+  if(backdrop) backdrop.classList.remove('open');
+  if(panel) panel.innerHTML='';
+  document.body.style.overflow='';
+}
+
+function handleTaskModalBackdropClick(event){
+  if(event.target && event.target.id==='taskModalBackdrop') closeTaskModal();
+}
+
+function getQuadrantIdForTask(task){
+  if(task.importance==='high' && task.urgency==='high') return 'q1';
+  if(task.importance==='high') return 'q2';
+  if(task.urgency==='high') return 'q3';
+  return 'q4';
+}
+
+function renderQuadrantPage(id,items){
+  const container=document.getElementById(id);
+  if(!container) return;
+
+  const total=items.length;
+  const totalPages=Math.max(1,Math.ceil(total/QUADRANT_PAGE_SIZE));
+  quadrantPageState[id]=Math.min(Math.max(quadrantPageState[id]||0,0),totalPages-1);
+  const page=quadrantPageState[id];
+  const visible=items.slice(page*QUADRANT_PAGE_SIZE,page*QUADRANT_PAGE_SIZE+QUADRANT_PAGE_SIZE);
+
+  const listHTML=visible.length
+    ? visible.map(item=>taskHTML(item.task,item.index)).join('')
+    : '<div class="quadrant-empty">暂无日程</div>';
+
+  const pagerHTML=total>QUADRANT_PAGE_SIZE
+    ? `<div class="quadrant-pager">
+        <button class="quadrant-page-btn" onclick="changeQuadrantPage(event,'${id}',-1)" ${page<=0?'disabled':''}>‹</button>
+        <span>${page+1} / ${totalPages} · 共 ${total} 条</span>
+        <button class="quadrant-page-btn" onclick="changeQuadrantPage(event,'${id}',1)" ${page>=totalPages-1?'disabled':''}>›</button>
+      </div>`
+    : `<div class="quadrant-pager"><span>${total} / ${QUADRANT_PAGE_SIZE} 条</span></div>`;
+
+  container.innerHTML=`<div class="quadrant-page-body">${listHTML}</div>${pagerHTML}`;
+}
+
+function changeQuadrantPage(event,id,step){
+  if(event) event.stopPropagation();
+  quadrantPageState[id]=(quadrantPageState[id]||0)+step;
+  renderQuadrants();
+}
+
+function renderQuadrants(){
+  const groups={q1:[],q2:[],q3:[],q4:[]};
+  tasks.forEach((task,index)=>{
+    if(task.done) return;
+    groups[getQuadrantIdForTask(task)].push({task,index});
+  });
+  Object.keys(groups).forEach(id=>renderQuadrantPage(id,groups[id]));
+}
+function updateCategory(index,value){
+  if(!tasks[index]) return;
+  tasks[index].category=value;
+  renderQuadrants();
+  renderCalendar();
+}
+function updateImportance(index,value){
+  if(!tasks[index]) return;
+  tasks[index].importance=value;
+  renderQuadrants();
+}
+function updateUrgency(index,value){
+  if(!tasks[index]) return;
+  tasks[index].urgency=value;
+  renderQuadrants();
+}
+function completeTaskById(taskId,btn){
+  const task = tasks.find(item => ensureTaskId(item) === taskId);
+  if(!task || task.done) return;
+
+  task.done = true;
+  renderCalendar();
+
+  const card = btn ? btn.closest('.task-card') : document.querySelector(`[data-task-id="${taskId}"]`);
+
+  if(btn){
+    btn.classList.add('do-running');
+  }
+
+  const finish = () => {
+    if(card){
+      createParticleBurst(card,'right');
+      card.classList.add('task-completing-right');
+      setTimeout(()=>{
+        renderQuadrants();
+        renderCalendar();
+      },430);
+    }else{
+      renderQuadrants();
+      renderCalendar();
+    }
+  };
+
+  setTimeout(finish,780);
+}
+
+function toggleTaskDoneById(taskId){
+  completeTaskById(taskId);
+}
+
+function deleteTaskById(taskId,btn){
+  const index = tasks.findIndex(item => ensureTaskId(item) === taskId);
+  if(index < 0) return;
+
+  const card = btn ? btn.closest('.task-card') : document.querySelector(`[data-task-id="${taskId}"]`);
+  const removeTask = () => {
+    const latestIndex = tasks.findIndex(item => ensureTaskId(item) === taskId);
+    if(latestIndex >= 0){
+      tasks.splice(latestIndex,1);
+    }
+    renderQuadrants();
+    renderCalendar();
+  };
+
+  if(card){
+    createParticleBurst(card);
+    card.classList.add('task-disintegrating');
+    setTimeout(removeTask,430);
+  }else{
+    removeTask();
+  }
+}
+
+function deleteTask(index,btn){
+  if(!tasks[index]) return;
+  deleteTaskById(ensureTaskId(tasks[index]),btn);
+}
+function createParticleBurst(card,direction='left'){
+  const rect = card.getBoundingClientRect();
+  const count = 90;
+  const toRight = direction === 'right';
+
+  for(let i=0;i<count;i++){
+    const dot = document.createElement('span');
+    dot.className='particle-dot';
+
+    const x = rect.left + Math.random() * rect.width;
+    const y = rect.top + Math.random() * rect.height;
+
+    dot.style.left = `${x}px`;
+    dot.style.top = `${y}px`;
+
+    const dx = toRight ? 80 + Math.random() * 260 : -80 - Math.random() * 260;
+    const dy = -40 + Math.random() * 120;
+
+    dot.style.setProperty('--dx', `${dx}px`);
+    dot.style.setProperty('--dy', `${dy}px`);
+    dot.style.animationDelay = `${Math.random() * 0.12}s`;
+
+    document.body.appendChild(dot);
+
+    setTimeout(()=>dot.remove(),1200);
+  }
+}
+
+function switchCalendarView(view){calendarView=view;document.getElementById('monthViewBtn').className=view==='month'?'px-5 py-2 rounded-xl bg-cyan-400 text-black font-bold transition-all duration-300':'px-5 py-2 rounded-xl glass font-bold transition-all duration-300';document.getElementById('weekViewBtn').className=view==='week'?'px-5 py-2 rounded-xl bg-cyan-400 text-black font-bold transition-all duration-300':'px-5 py-2 rounded-xl glass font-bold transition-all duration-300';renderCalendar()}function changeWeek(step){currentWeek+=step;if(currentWeek<0)currentWeek=0;if(currentWeek>4)currentWeek=4;renderCalendar()}function changeMonth(step){currentMonth+=step;if(currentMonth<0)currentMonth=11;if(currentMonth>11)currentMonth=0;currentWeek=0;const today=getTodayPartsForCalendar();document.getElementById('monthLabel').innerText=`${today.year} · ${monthNames[currentMonth]}`;renderCalendar()}function goToToday(){const today=getTodayPartsForCalendar();currentMonth=today.month-1;currentWeek=Math.floor((today.day-1)/7);document.getElementById('monthLabel').innerText=`${today.year} · ${monthNames[currentMonth]}`;renderCalendar()}
+function getTaskCalendarOccurrences(task){
+  const list = [];
+  const eventDateTime = getTaskEventDateTime(task);
+
+  if(eventDateTime){
+    list.push({task, type:'event', datetime:eventDateTime, date:String(eventDateTime).slice(0,10)});
+  }
+
+  if(!isKnownEmptyTime(task.deadline)){
+    list.push({task, type:'deadline', datetime:task.deadline, date:String(task.deadline).slice(0,10)});
+  }
+
+  return list;
+}
+
+function getOccurrenceTimeLabel(occ){
+  if(occ.type === 'deadline'){
+    const t = extractHourMinute(occ.datetime);
+    return t ? `截止 ${t}` : '截止时间';
+  }
+  return getTaskTimeLabel(occ.task);
+}
+
+function getOccurrenceTitle(occ){
+  return occ.type === 'deadline' ? `截止：${occ.task.title}` : occ.task.title;
+}
+
+function getVisibleWeekRange(){
+  const today = getTodayPartsForCalendar();
+  const year = today.year;
+  const daysInMonth = new Date(year,currentMonth+1,0).getDate();
+  const startDay = 1 + currentWeek * 7;
+  const endDay = Math.min(startDay + 6, daysInMonth);
+
+  return {
+    year,
+    startDay,
+    endDay,
+    startKey: `${year}-${String(currentMonth+1).padStart(2,'0')}-${String(startDay).padStart(2,'0')}`,
+    endKey: `${year}-${String(currentMonth+1).padStart(2,'0')}-${String(endDay).padStart(2,'0')}`
+  };
+}
+
+function updateWeeklyCompletedPanel(){
+  const panel = document.getElementById('weekCompletedPanel');
+  const countEl = document.getElementById('weekCompletedCount');
+  const rangeEl = document.getElementById('weekCompletedRange');
+  if(!panel || !countEl || !rangeEl) return;
+
+  if(calendarView !== 'week'){
+    panel.classList.add('hidden');
+    return;
+  }
+
+  const range = getVisibleWeekRange();
+  const completedCount = tasks.filter(task=>{
+    if(!task || !task.done) return false;
+    return getTaskCalendarOccurrences(task).some(occ=>occ.date >= range.startKey && occ.date <= range.endKey);
+  }).length;
+
+  panel.classList.remove('hidden');
+  countEl.textContent = completedCount;
+  rangeEl.textContent = `${currentMonth + 1}月${range.startDay}日 - ${currentMonth + 1}月${range.endDay}日 · 本周已完成日程`;
+}
+
+function renderCalendar(){
+  updateWeeklyCompletedPanel();
+
+  const grid=document.getElementById('calendarGrid');
+  grid.innerHTML='';
+  grid.classList.remove('calendar-animate');
+  void grid.offsetWidth;
+  grid.classList.add('calendar-animate');
+
+  const today=getTodayPartsForCalendar();
+  const year=today.year;
+  const daysInMonth=new Date(year,currentMonth+1,0).getDate();
+
+  let startDay=1;
+  let endDay=daysInMonth;
+
+  if(calendarView==='week'){
+    startDay=1+currentWeek*7;
+    endDay=Math.min(startDay+6,daysInMonth);
+  }
+
+  const occurrences = tasks.filter(Boolean).flatMap(getTaskCalendarOccurrences);
+
+  for(let i=startDay;i<=endDay;i++){
+    const div=document.createElement('div');
+    const isToday=today.day===i && (today.month-1)===currentMonth;
+
+    const monthString=String(currentMonth+1).padStart(2,'0');
+    const dayString=String(i).padStart(2,'0');
+    const dateKey = `${year}-${monthString}-${dayString}`;
+
+    const dayItems=occurrences
+      .filter(occ=>occ.date === dateKey)
+      .sort((a,b)=>{
+        const av = Date.parse(String(a.datetime).replace(/-/g,'/'));
+        const bv = Date.parse(String(b.datetime).replace(/-/g,'/'));
+        return (Number.isNaN(av)?Number.MAX_SAFE_INTEGER:av) - (Number.isNaN(bv)?Number.MAX_SAFE_INTEGER:bv);
+      });
+
+    const baseHeight = calendarView==='week'
+      ? Math.max(120, 86 + dayItems.length * 58)
+      : Math.max(120, 120 + dayItems.length * 28);
+
+    div.className=`calendar-day glass rounded-2xl p-3 ${isToday?'today-highlight':''}`;
+    div.style.minHeight=`${baseHeight}px`;
+
+    const itemHTML = dayItems.map(occ=>{
+      const category = occ.type === 'deadline' ? '报名' : (occ.task.category || '未分类');
+      const doneClass = occ.task.done ? 'opacity-50' : '';
+      const titleClass = occ.task.done ? 'line-through' : '';
+      if(calendarView==='week'){
+        return `<div class="${getCategoryColor(category)} ${doneClass} border rounded-xl px-2 py-2 text-xs leading-5">
+          <div class="font-bold ${titleClass}">${escapeHTML(getOccurrenceTitle(occ))}</div>
+          <div class="opacity-80">${getOccurrenceTimeLabel(occ)}</div>
+        </div>`;
+      }
+
+      return `<div class="${getCategoryColor(category)} ${doneClass} border rounded-xl px-2 py-1 text-xs">
+        <span class="${titleClass}">${escapeHTML(getOccurrenceTitle(occ))}</span>
+      </div>`;
+    }).join('');
+
+    div.innerHTML=`<div class="font-bold mb-3 text-slate-400">${i}</div><div class="space-y-2">${itemHTML}</div>`;
+
+    grid.appendChild(div);
+  }
+}
+
+document.addEventListener('DOMContentLoaded',()=>{
+  document.addEventListener('click',closeGlassSelects);
+  document.addEventListener('keydown',e=>{
+    if(e.key==='Escape'){ closeGlassSelects(); closeTaskModal(); }
+  });
+
+  initMiniMaxConfig();
+  initTimeContextSettings();
+
+  const keywordInput=document.getElementById('newBreakKeyword');
+  if(keywordInput){
+    keywordInput.addEventListener('keydown',e=>{
+      if(e.key==='Enter'){
+        e.preventDefault();
+        addBreakKeyword();
+      }
+    });
+  }
+
+  const categoryInput=document.getElementById('newCategory');
+  if(categoryInput){
+    categoryInput.addEventListener('keydown',e=>{
+      if(e.key==='Enter'){
+        e.preventDefault();
+        addCategory();
+      }
+    });
+  }
+});
+
+window.onload=()=>{switchPage(0);renderCategories();renderBreakKeywords();goToToday()};
+</script></body></html>
